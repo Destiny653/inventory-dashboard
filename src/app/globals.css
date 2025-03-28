@@ -1,17 +1,7 @@
-@import "tailwindcss/preflight"; 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* Removed duplicate @tailwind utilities; */
-@import "tailwindcss";
-@import "tw-animate-css";
-
-/* Corrected custom variant syntax */
-/* @layer utilities {
-  .dark-mode {
-    @apply dark;
-  }
-} */
+ 
 
 @layer theme {
   :root {
@@ -83,6 +73,8 @@
 
 /* Dark theme (if needed) */
 .dark {
+   --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
   --theme-50: #18181b;
   --theme-100: #27272a;
   --theme-200: #3f3f46;
@@ -277,7 +269,7 @@
     --theme-900: 336 69% 35%;
   }
 
-  .dark {
+  .dark { 
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;

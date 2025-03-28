@@ -3,16 +3,16 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  LineChart, 
-  Line, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
 } from 'recharts'
 import { ArrowUpRight, Package, ShoppingCart, AlertTriangle, CreditCard } from 'lucide-react'
 
@@ -38,10 +38,10 @@ export default function DashboardPage() {
   async function fetchDashboardData() {
     try {
       setLoading(true)
-      
+
       // In a real app, these would be actual Supabase queries
       // Simulating data for demonstration
-      
+
       // Dashboard stats
       setStats({
         totalRevenue: 24780,
@@ -50,7 +50,7 @@ export default function DashboardPage() {
         lowStockItems: 12,
         pendingPayouts: 3
       })
-      
+
       // Recent sales data
       setRecentSales([
         { date: '2025-03-20', sales: 1200 },
@@ -75,7 +75,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard Overview</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -90,7 +90,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
@@ -104,7 +104,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Products</CardTitle>
@@ -117,7 +117,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Pending Payouts</CardTitle>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -150,12 +150,12 @@ export default function DashboardPage() {
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
+                  <XAxis
+                    dataKey="date"
                     tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   />
                   <YAxis />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => [`$${value}`, 'Sales']}
                     labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                   />
@@ -171,7 +171,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -180,25 +180,26 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <a href="/dashboard/products" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors flex flex-col items-center justify-center text-center">
-                  <Package className="h-8 w-8 mb-2" />
+                  <Package className="h-8 w-8 mb-2 text-blue-500" />
                   <span className="font-medium">Add New Product</span>
                 </a>
                 <a href="/dashboard/orders" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors flex flex-col items-center justify-center text-center">
-                  <ShoppingCart className="h-8 w-8 mb-2" />
+                  <ShoppingCart className="h-8 w-8 mb-2 text-green-500" />
                   <span className="font-medium">View Orders</span>
                 </a>
                 <a href="/dashboard/stock-alerts" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors flex flex-col items-center justify-center text-center">
-                  <AlertTriangle className="h-8 w-8 mb-2" />
+                  <AlertTriangle className="h-8 w-8 mb-2 text-amber-500" />
                   <span className="font-medium">Stock Alerts</span>
                 </a>
                 <a href="/dashboard/payouts" className="p-4 border rounded-lg hover:bg-gray-50 transition-colors flex flex-col items-center justify-center text-center">
-                  <CreditCard className="h-8 w-8 mb-2" />
+                  <CreditCard className="h-8 w-8 mb-2 text-purple-500" />
                   <span className="font-medium">Request Payout</span>
                 </a>
               </div>
             </div>
           </CardContent>
         </Card>
+
       </div>
     </div>
   )
