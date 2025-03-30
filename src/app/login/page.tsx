@@ -57,7 +57,7 @@ export default function LoginPage() {
             setLoading(true)
             setError('')
 
-            const isAdmin = ['sabrinaloden448@gmail.com', 'fokundem653@gmail.com'].includes(email.toLowerCase())
+            const isAdmin = [process.env.ADMIN_MAIL_TWO, process.env.ADMIN_MAIL_ONE].includes(email.toLowerCase())
 
             if (!isAdmin) { 
                 router.push('/unauthorized')
