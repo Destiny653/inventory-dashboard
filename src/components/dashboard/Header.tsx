@@ -1,4 +1,4 @@
-'use client'
+ 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -75,35 +75,35 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
   ]
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b bg-background px-2 md:px-6">
       <Sheet>
         <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="md:hidden">
-            <Menu className="h-5 w-5" />
+          <Button variant="outline" size="icon" className="h-8 w-8 md:h-9 md:w-9 md:hidden">
+            <Menu className="h-4 w-4" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="pr-0">
+        <SheetContent side="left" className="pr-0 md:hidden">
           <Sidebar className="px-2" />
         </SheetContent>
       </Sheet>
 
-      <Link href="/" className="flex items-center gap-2 md:gap-3">
-        <span className="font-bold text-xl text-theme">MultiVendor</span>
+      <Link href="/" className="flex items-center gap-1 md:gap-3">
+        <span className="font-bold text-base md:text-xl text-theme">MultiVendor</span>
       </Link>
 
-      <div className="relative md:flex-1 md:flex md:justify-center">
+      <div className="relative flex-1 md:flex md:justify-center">
         {searchOpen ? (
           <div className="absolute inset-0 flex items-center bg-background md:relative md:w-2/1 md:mx-auto">
             <input
               type="search"
               placeholder="Search..."
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-theme"
+              className="flex h-8 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-theme"
             />
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-0"
+              className="absolute right-0 h-8 w-8 md:h-9 md:w-9"
               onClick={() => setSearchOpen(false)}
             >
               <X className="h-4 w-4" />
@@ -114,7 +114,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
           <Button
             variant="outline"
             size="icon"
-            className="ml-auto md:hidden"
+            className="ml-auto h-8 w-8 md:h-9 md:w-9 md:hidden"
             onClick={() => setSearchOpen(true)}
           >
             <Search className="h-4 w-4" />
@@ -132,13 +132,15 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Theme Switcher */}
-        <ThemeSwitcher />
+      <div className="flex items-center gap-1 md:gap-2">
+        {/* Theme Switcher - Hide on smallest screens */}
+        <div className="hidden xs:block">
+          <ThemeSwitcher />
+        </div>
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" className="relative">
+            <Button variant="outline" size="icon" className="relative h-8 w-8 md:h-9 md:w-9">
               <Bell className="h-4 w-4" />
               {notifications.filter(n => !n.read).length > 0 && (
                 <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-theme"></span>
@@ -146,7 +148,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
               <span className="sr-only">Notifications</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-0 bg-white" align="end">
+          <PopoverContent className="w-[calc(100vw-20px)] sm:w-80 p-0 bg-white" align="end">
             <div className="p-3 border-b">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Notifications</h4>
@@ -194,13 +196,15 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="pl-2 pr-3 h-9 ">
-              <Avatar className="h-6 w-6 mr-2 border border-theme-200">
+            <Button variant="outline" size="sm" className="h-8 md:h-9 pl-1 pr-2 md:pl-2 md:pr-3">
+              <Avatar className="h-5 w-5 md:h-6 md:w-6 mr-1 md:mr-2 border border-theme-200">
                 <AvatarImage src={user?.avatar || ''} alt={user?.name || 'User'} />
-                <AvatarFallback className="bg-theme-100 text-theme-800">{user?.name?.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarFallback className="bg-theme-100 text-theme-800 text-xs md:text-sm">{user?.name?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
-              <span className="max-w-[100px] truncate">{user?.name || 'User'}</span>
-              <ChevronDown className="ml-2 h-4 w-4 text-muted-foreground" />
+              <span className="max-w-[40px] md:max-w-[100px] truncate text-xs md:text-sm">
+                {user?.name || 'User'}
+              </span>
+              <ChevronDown className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-blue-500 text-white">

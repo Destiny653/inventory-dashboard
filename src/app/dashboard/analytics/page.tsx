@@ -1,4 +1,4 @@
-'use client'
+ 'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -17,6 +17,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from 'recharts'
 
 interface SalesData {
@@ -39,9 +40,18 @@ export default function AnalyticsPage() {
   const [categoryData, setCategoryData] = useState<CategoryData[]>([])
   const [topProducts, setTopProducts] = useState<ProductData[]>([])
   const [loading, setLoading] = useState(true)
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
   
   useEffect(() => {
     fetchAnalyticsData()
+    
+    // Add responsive window size listener
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
   
   async function fetchAnalyticsData() {
@@ -91,6 +101,23 @@ export default function AnalyticsPage() {
   
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
   
+  // Custom label for pie chart that's responsive
+  const renderPieLabel = ({ name, percent }: { name: string; percent: number }) => {
+    // On mobile, don't show labels directly on the pie
+    if (windowWidth < 768) return null
+    
+    return `${name} ${(percent * 100).toFixed(0)}%`
+  }
+  
+  // Responsive product names for bar chart
+  const getProductName = (name: string): string => {
+    if (windowWidth < 640) {
+      // Truncate names on very small screens
+      return name.length > 10 ? `${name.substring(0, 8)}...` : name
+    }
+    return name
+  }
+  
   if (loading) {
     return <div className="flex justify-center items-center h-64">Loading analytics data...</div>
   }
@@ -99,7 +126,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Sales Analytics</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -118,7 +145,7 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground">+12.2% from last month</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="sm:col-span-2 md:col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Average Order Value</CardTitle>
           </CardHeader>
@@ -130,38 +157,39 @@ export default function AnalyticsPage() {
       </div>
       
       <Tabs defaultValue="sales" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="sales">Sales Trends</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="products">Top Products</TabsTrigger>
+        <TabsList className="w-full flex justify-between sm:justify-start sm:w-auto overflow-x-auto">
+          <TabsTrigger value="sales" className="flex-1 sm:flex-none">Sales Trends</TabsTrigger>
+          <TabsTrigger value="categories" className="flex-1 sm:flex-none">Categories</TabsTrigger>
+          <TabsTrigger value="products" className="flex-1 sm:flex-none">Top Products</TabsTrigger>
         </TabsList>
         
         <TabsContent value="sales" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Monthly Sales</CardTitle>
+            <CardHeader className="pb-0 sm:pb-2">
+              <CardTitle className="text-base sm:text-lg">Monthly Sales</CardTitle>
             </CardHeader>
             <CardContent className="pt-2">
-              <div className="h-[300px]">
+              <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={salesData}
                     margin={{
                       top: 5,
-                      right: 30,
-                      left: 20,
+                      right: 10,
+                      left: windowWidth < 640 ? 0 : 20,
                       bottom: 5,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
+                    <XAxis dataKey="month" tick={{ fontSize: windowWidth < 640 ? 10 : 12 }} />
+                    <YAxis tick={{ fontSize: windowWidth < 640 ? 10 : 12 }} width={windowWidth < 640 ? 30 : 40} />
                     <Tooltip />
                     <Line 
                       type="monotone" 
                       dataKey="sales" 
                       stroke="#8884d8" 
-                      activeDot={{ r: 8 }} 
+                      activeDot={{ r: 6 }} 
+                      strokeWidth={windowWidth < 640 ? 1.5 : 2}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -172,28 +200,34 @@ export default function AnalyticsPage() {
         
         <TabsContent value="categories" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Sales by Category</CardTitle>
+            <CardHeader className="pb-0 sm:pb-2">
+              <CardTitle className="text-base sm:text-lg">Sales by Category</CardTitle>
             </CardHeader>
             <CardContent className="pt-2">
-              <div className="h-[300px]">
+              <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      outerRadius={100}
+                      labelLine={windowWidth >= 768}
+                      outerRadius={windowWidth < 640 ? 70 : 100}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={renderPieLabel}
                     >
                       {categoryData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip />
+                    <Legend 
+                      layout={windowWidth < 768 ? "horizontal" : "vertical"} 
+                      verticalAlign={windowWidth < 768 ? "bottom" : "middle"}
+                      align={windowWidth < 768 ? "center" : "right"}
+                      wrapperStyle={windowWidth < 768 ? {} : { right: 0 }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -203,25 +237,36 @@ export default function AnalyticsPage() {
         
         <TabsContent value="products" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Top Selling Products</CardTitle>
+            <CardHeader className="pb-0 sm:pb-2">
+              <CardTitle className="text-base sm:text-lg">Top Selling Products</CardTitle>
             </CardHeader>
             <CardContent className="pt-2">
-              <div className="h-[300px]">
+              <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={topProducts}
+                    data={topProducts.map(product => ({
+                      ...product,
+                      name: getProductName(product.name)
+                    }))}
                     layout="vertical"
                     margin={{
                       top: 5,
-                      right: 30,
-                      left: 100,
+                      right: 10,
+                      left: windowWidth < 640 ? 60 : 100,
                       bottom: 5,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" />
+                    <XAxis 
+                      type="number" 
+                      tick={{ fontSize: windowWidth < 640 ? 10 : 12 }} 
+                    />
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      tick={{ fontSize: windowWidth < 640 ? 10 : 12 }}
+                      width={windowWidth < 640 ? 60 : 100}
+                    />
                     <Tooltip />
                     <Bar dataKey="sales" fill="#8884d8" />
                   </BarChart>
