@@ -94,7 +94,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
 
       <div className="relative md:flex-1 md:flex md:justify-center">
         {searchOpen ? (
-          <div className="absolute inset-0 flex items-center bg-background md:relative md:w-2/3 md:mx-auto">
+          <div className="absolute inset-0 flex items-center bg-background md:relative md:w-2/1 md:mx-auto">
             <input
               type="search"
               placeholder="Search..."
