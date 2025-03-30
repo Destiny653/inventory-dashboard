@@ -6,7 +6,7 @@ interface HomeProps {
   children: React.ReactNode;
 }
 
-export default function Home({ children }: HomeProps) {
+export default function Home() {
   return (
     <DashboardLayout> 
       <ProfilePage/>
