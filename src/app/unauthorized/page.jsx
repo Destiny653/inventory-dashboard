@@ -52,7 +52,7 @@ export default function UnauthorizedPage() {
 
         <Button
           variant="primary"
-          className="w-full mb-4"
+          className="w-full mb-4 border"
           onClick={() => router.push('/login')}
         >
             Login
