@@ -389,7 +389,7 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
                   </div>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-2 bg-white">
                   <Label htmlFor="category">Category</Label>
                   <Select
                     value={formData.category_id}
@@ -398,14 +398,14 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className='w-full bg-white'>
                       <SelectItem value="none">None</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>
                       ))}
-                    </SelectContent>
+                    </SelectContent> 
                   </Select>
                 </div>
               </div>

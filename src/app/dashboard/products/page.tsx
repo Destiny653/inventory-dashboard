@@ -27,6 +27,11 @@ import ProductDetails from '@/components/dashboard/ProductDetails'
 
 export default function ProductsPage() {
 
+  // Add these near your other state declarations
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+
+
   const [products, setProducts] = useState<{
     id: number;
     name: string;
@@ -44,30 +49,61 @@ export default function ProductsPage() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const itemsPerPage = 8
+  const itemsPerPage = 9
 
   useEffect(() => {
     fetchProducts()
-  }, [currentPage]) // Refetch when page changes
+    fetchCategories()
+  }, [currentPage, selectedCategory]) // Refetch when page changes
+
+  async function fetchCategories() {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .order('name')
+
+      if (error) throw error
+      setCategories(data || [])
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }
+
 
   async function fetchProducts() {
     try {
       setLoading(true)
-
-      // First get the total count for pagination
-      const { count, error: countError } = await supabase
-        .from('products')
-        .select('id', { count: 'exact', head: true })
-
-      if (countError) throw countError
-      setTotalCount(count || 0)
-
-      // Then fetch the current page of data
-      const { data, error } = await supabase
+      
+      // Build the base query with select first
+      let query = supabase
         .from('products')
         .select('*, categories(id, name)')
+      
+      // Add category filter if a category is selected
+      if (selectedCategory !== 'all') {
+        query = query.eq('category_id', selectedCategory)
+      }
+      
+      // Get total count
+      const countQuery = supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+      
+      // Apply category filter to count query if needed
+      if (selectedCategory !== 'all') {
+        countQuery.eq('category_id', selectedCategory)
+      }
+      
+      const { count, error: countError } = await countQuery
+      
+      if (countError) throw countError
+      setTotalCount(count || 0)
+      
+      // Get paginated data
+      const { data, error } = await query
         .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1)
-
+      
       if (error) throw error
       setProducts(data || [])
     } catch (error) {
@@ -76,7 +112,7 @@ export default function ProductsPage() {
       setLoading(false)
     }
   }
-
+  
   // When searching, we need to reset pagination
   useEffect(() => {
     setCurrentPage(1)
@@ -145,13 +181,28 @@ export default function ProductsPage() {
         </Dialog>
       </div>
 
-      <div className="flex items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
         <Input
           placeholder="Search products..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm bg-white"
         />
+        <select
+          value={selectedCategory}
+          onChange={(e) => {
+            setSelectedCategory(e.target.value)
+            setCurrentPage(1) // Reset to first page when changing category
+          }}
+          className="h-10 px-3 py-2 rounded-md border border-input bg-white text-sm ring-offset-background"
+        >
+          <option value="all">All Categories</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
