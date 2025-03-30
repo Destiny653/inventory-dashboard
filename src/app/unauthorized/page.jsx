@@ -48,18 +48,7 @@ export default function UnauthorizedPage() {
             </p>
           </div>
         )}
-        
-        <div className="flex flex-col space-y-3">
-          <Button asChild variant="outline">
-            <Link href="/">
-              Return to Home
-            </Link>
-          </Button>
-          
-          <Button onClick={handleSignOut} variant="ghost">
-            Sign Out
-          </Button>
-        </div>
+       
       </div>
     </div>
   )
