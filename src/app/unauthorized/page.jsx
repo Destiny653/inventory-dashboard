@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Shield, AlertTriangle } from 'lucide-react'
 
+
 export default function UnauthorizedPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -48,6 +49,14 @@ export default function UnauthorizedPage() {
             </p>
           </div>
         )}
+
+        <Button
+          variant="primary"
+          className="w-full mb-4"
+          onClick={() => router.push('/login')}
+        >
+            Login
+        </Button>
        
       </div>
     </div>

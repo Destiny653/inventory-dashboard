@@ -161,12 +161,12 @@ export default function LoginPage() {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="password">Password</Label>
-                                    <Link
+                                    {/* <Link
                                         href="/forgot-password"
                                         className="text-sm text-blue-600 hover:text-blue-500"
                                     >
                                         Forgot password?
-                                    </Link>
+                                    </Link> */}
                                 </div>
                                 <div className="relative">
                                     <Input
@@ -259,14 +259,14 @@ export default function LoginPage() {
                             Google
                         </Button>
                     </CardContent>
-                    <CardFooter className="flex justify-center">
+                    {/* <CardFooter className="flex justify-center">
                         <p className="text-sm text-gray-600">
                             Don't have an account?{' '}
                             <Link href="/register" className="text-blue-600 hover:text-blue-500 font-medium">
                                 Sign up
                             </Link>
                         </p>
-                    </CardFooter>
+                    </CardFooter> */}
                 </Card>
 
                 <div className="text-center mt-6">

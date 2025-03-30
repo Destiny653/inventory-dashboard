@@ -1,15 +1,12 @@
  import React from 'react'
-import DashboardLayout from './dashboard/layout'
-import ProfilePage from './dashboard/profile/page';
+import DashboardLayout from './dashboard/layout' 
+import LoginPage from './login/page';
  
-interface HomeProps {
-  children: React.ReactNode;
-}
-
+ 
 export default function Home() {
   return (
     <DashboardLayout> 
-      <ProfilePage/>
+      <LoginPage/>
     </DashboardLayout>
   );
 }
