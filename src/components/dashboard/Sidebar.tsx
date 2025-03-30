@@ -14,7 +14,7 @@ import {
   Store
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useTheme } from '@/app/context/ThemeContext'
+import { useTheme } from '@/context/ThemeContext'
 
 const vendorLinks = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },

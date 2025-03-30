@@ -133,7 +133,7 @@ export default function OrdersPage() {
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="none" unselectable='off'>All Status</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="processing">Processing</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>

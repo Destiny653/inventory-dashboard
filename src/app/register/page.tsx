@@ -1,4 +1,5 @@
- 'use client'
+// app/register/page.tsx
+'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,7 +7,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
     Card,
     CardContent,
@@ -24,15 +24,16 @@ import { Separator } from '@/components/ui/separator'
 import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-export default function LoginPage() {
+export default function RegisterPage() {
     const router = useRouter()
+    const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
-    const [rememberMe, setRememberMe] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    
+
     // Check if user is already logged in
     useEffect(() => {
         const checkSession = async () => {
@@ -42,14 +43,26 @@ export default function LoginPage() {
                 router.push('/dashboard')
             }
         }
-        
+
         checkSession()
     }, [router])
 
-    async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+    async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault()
-        if (!email || !password) {
-            setError('Please enter both email and password')
+
+        // Form validation
+        if (!name || !email || !password) {
+            setError('Please fill in all required fields')
+            return
+        }
+
+        if (password !== confirmPassword) {
+            setError('Passwords do not match')
+            return
+        }
+
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters')
             return
         }
 
@@ -57,18 +70,17 @@ export default function LoginPage() {
             setLoading(true)
             setError('')
 
-            const isAdmin = ['sabrinaloden448@gmail.com', 'fokundem653@gmail.com'].includes(email.toLowerCase())
-
-            if (!isAdmin) { 
-                router.push('/unauthorized')
-                return
-            }
-
-
-            // Real Supabase auth call
-            const { data, error } = await supabase.auth.signInWithPassword({
+            // Register with Supabase
+            const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
+                options: {
+                    data: {
+                        name,
+                        // Default role for new users
+                        role: 'customer',
+                    }
+                }
             })
 
             if (error) {
@@ -76,63 +88,51 @@ export default function LoginPage() {
             }
 
             if (data?.user) {
-                // Check user metadata or role to determine redirect path
-                // For now, we'll use email as a simple way to determine role
-                let redirectPath = '/dashboard'
-                
-                // You can store user roles in user metadata when they sign up
-                // and check that here instead of using email
-                if (email.includes('admin')) {
-                    redirectPath = '/dashboard/admin'
-                } else if (email.includes('vendor')) {
-                    redirectPath = '/dashboard/vendor'
-                }
-
-                // Redirect to dashboard
-                router.push(redirectPath)
+                // Redirect to dashboard or confirmation page
+                router.push('/dashboard')
             }
         } catch (err: any) {
-            console.error('Login error:', err)
+            console.error('Registration error:', err)
             setError(err.message || 'An unexpected error occurred. Please try again.')
         } finally {
             setLoading(false)
         }
     }
 
-    async function handleGoogleLogin() {
+    async function handleGoogleSignUp() {
         try {
             setLoading(true)
-            
+
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: `${window.location.origin}/auth/callback`
                 }
             })
-            
+
             if (error) throw error
-            
+
             // The redirect happens automatically by Supabase
         } catch (err: any) {
-            console.error('Google login error:', err)
-            setError(err.message || 'Failed to sign in with Google. Please try again.')
+            console.error('Google sign up error:', err)
+            setError(err.message || 'Failed to sign up with Google. Please try again.')
             setLoading(false)
         }
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
             <div className="w-full max-w-md">
-                <div className="text-center mb-8">
+                <div className="text-center mb-5">
                     <h1 className="text-3xl font-bold">MultiVendor Market</h1>
-                    <p className="text-gray-600 mt-2">Sign in to your account</p>
+                    <p className="text-gray-600 mt-2">Create your account</p>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Sign In</CardTitle>
+                        <CardTitle>Sign Up</CardTitle>
                         <CardDescription>
-                            Enter your credentials to access your account
+                            Enter your information to create an account
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -144,7 +144,20 @@ export default function LoginPage() {
                             </Alert>
                         )}
 
-                        <form onSubmit={handleLogin} className="space-y-4">
+                        <form onSubmit={handleRegister} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Full Name</Label>
+                                <Input
+                                    id="name"
+                                    type="text"
+                                    placeholder="John Doe"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    disabled={loading}
+                                    required
+                                />
+                            </div>
+
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
                                 <Input
@@ -157,54 +170,49 @@ export default function LoginPage() {
                                     required
                                 />
                             </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                            <div className='space-y-3 md:flex md:space-x-4 md:space-y-0 flex-col sm:flex-row items-center justify-center'>
+                                <div className="space-y-2 w-full">
                                     <Label htmlFor="password">Password</Label>
-                                    <Link
-                                        href="/forgot-password"
-                                        className="text-sm text-blue-600 hover:text-blue-500"
-                                    >
-                                        Forgot password?
-                                    </Link>
+                                    <div className="relative">
+                                        <Input
+                                            id="password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            placeholder="••••••••"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                        >
+                                            {showPassword ? (
+                                                <EyeOff className="h-4 w-4" />
+                                            ) : (
+                                                <Eye className="h-4 w-4" />
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="relative">
-                                    <Input
-                                        id="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        disabled={loading}
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                    >
-                                        {showPassword ? (
-                                            <EyeOff className="h-4 w-4" />
-                                        ) : (
-                                            <Eye className="h-4 w-4" />
-                                        )}
-                                    </button>
+
+                                <div className="space-y-2 w-full">
+                                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="confirmPassword"
+                                            type={showPassword ? 'text' : 'password'}
+                                            placeholder="••••••••"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="remember"
-                                    checked={rememberMe}
-                                    onCheckedChange={(checked) => setRememberMe(!!checked)}
-                                />
-                                <Label
-                                    htmlFor="remember"
-                                    className="text-sm font-normal cursor-pointer"
-                                >
-                                    Remember me for 30 days
-                                </Label>
-                            </div>
                             <Button
                                 type="submit"
                                 className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded shadow-[0_3px_2px_0_rgba(0,0,0,0.3)] hover:bg-blue-700 hover:shadow-[0_6px_20px_rgba(0,0,0,0.2)] transition-all duration-200 ease-in-out dark:bg-blue-500 dark:text-white dark:shadow-[0_4px_14px_0_rgba(255,255,255,0.1)] dark:hover:shadow-[0_6px_20px_rgba(255,255,255,0.15)] dark:hover:bg-blue-400"
@@ -213,10 +221,10 @@ export default function LoginPage() {
                                 {loading ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Signing in...
+                                        Creating account...
                                     </>
                                 ) : (
-                                    'Sign In'
+                                    'Create Account'
                                 )}
                             </Button>
                         </form>
@@ -235,7 +243,7 @@ export default function LoginPage() {
                         <Button
                             variant="outline"
                             className="w-full"
-                            onClick={handleGoogleLogin}
+                            onClick={handleGoogleSignUp}
                             disabled={loading}
                         >
                             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -261,9 +269,9 @@ export default function LoginPage() {
                     </CardContent>
                     <CardFooter className="flex justify-center">
                         <p className="text-sm text-gray-600">
-                            Don't have an account?{' '}
-                            <Link href="/register" className="text-blue-600 hover:text-blue-500 font-medium">
-                                Sign up
+                            Already have an account?{' '}
+                            <Link href="/login" className="text-blue-600 hover:text-blue-500 font-medium">
+                                Sign in
                             </Link>
                         </p>
                     </CardFooter>
@@ -271,7 +279,7 @@ export default function LoginPage() {
 
                 <div className="text-center mt-6">
                     <p className="text-xs text-gray-500">
-                        By signing in, you agree to our{' '}
+                        By signing up, you agree to our{' '}
                         <Link href="/terms" className="underline hover:text-gray-700">
                             Terms of Service
                         </Link>{' '}
@@ -280,16 +288,6 @@ export default function LoginPage() {
                             Privacy Policy
                         </Link>
                     </p>
-                </div>
-
-                {/* Demo account information */}
-                <div className="mt-8 p-4 border border-blue-100 rounded-md bg-blue-50">
-                    <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Accounts</h3>
-                    <div className="text-xs text-blue-700 space-y-1">
-                        <p>Customer: customer@example.com / password</p>
-                        <p>Vendor: vendor@example.com / password</p>
-                        <p>Admin: admin@example.com / password</p>
-                    </div>
                 </div>
             </div>
         </div>

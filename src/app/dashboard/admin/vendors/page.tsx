@@ -305,7 +305,7 @@ export default function AdminVendorsPage() {
                                             <TableCell>${vendor.total_sales.toLocaleString()}</TableCell>
                                             <TableCell>{formatDate(vendor.joined_date)}</TableCell>
                                             <TableCell className="text-right">
-                                                {/* <DropdownMenu>
+                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="icon">
                                                             <MoreVertical className="h-4 w-4" />
@@ -345,7 +345,7 @@ export default function AdminVendorsPage() {
                                                             Delete Vendor
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
-                                                </DropdownMenu> */}
+                                                </DropdownMenu> 
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -357,7 +357,7 @@ export default function AdminVendorsPage() {
             </Card>
 
             {/* Vendor Details Dialog */}
-            {/* {selectedVendor && (
+            {selectedVendor && (
                 <Dialog open={selectedVendor !== null && !isDeleteAlertOpen} onOpenChange={(open) => !open && setSelectedVendor(null)}>
                     <DialogContent className="sm:max-w-[600px]">
                         <DialogHeader>
@@ -458,10 +458,10 @@ export default function AdminVendorsPage() {
                         </div>
                     </DialogContent>
                 </Dialog>
-            )} */}
+            )}
 
             {/* Delete Confirmation Dialog */}
-            {/* <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -480,7 +480,7 @@ export default function AdminVendorsPage() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog> */}
+            </AlertDialog>
         </div>
     );
 };

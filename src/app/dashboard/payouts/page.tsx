@@ -167,19 +167,19 @@ export default function PayoutsPage() {
   }
   
   if (loading) {
-    return <div className="flex justify-center items-center h-64">Loading payout data...</div>
+    return <div className="flex justify-center items-center h-64 bg-white">Loading payout data...</div>
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-white">
       <h1 className="text-2xl font-bold">Payouts</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
+        <Card className="bg-white">
+          <CardHeader className="bg-white">
             <CardTitle>Available Balance</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="bg-white">
             <div className="text-3xl font-bold">${balance.toFixed(2)}</div>
             <p className="text-sm text-muted-foreground mt-1">
               Available for withdrawal
@@ -192,14 +192,14 @@ export default function PayoutsPage() {
                   Request Payout
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
+              <DialogContent className="sm:max-w-[425px] bg-white">
+                <DialogHeader className="bg-white">
                   <DialogTitle>Request Payout</DialogTitle>
                   <DialogDescription>
                     Enter the amount you want to withdraw and select your preferred method.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={requestPayout} className="space-y-4 py-4">
+                <form onSubmit={requestPayout} className="space-y-4 py-4 bg-white">
                   <div className="space-y-2">
                     <Label htmlFor="amount">Amount</Label>
                     <div className="relative">
@@ -212,7 +212,7 @@ export default function PayoutsPage() {
                         max={balance}
                         value={payoutAmount}
                         onChange={(e) => setPayoutAmount(e.target.value)}
-                        className="pl-7"
+                        className="pl-7 bg-white"
                         placeholder="0.00"
                         required
                       />
@@ -228,10 +228,10 @@ export default function PayoutsPage() {
                       value={payoutMethod} 
                       onValueChange={setPayoutMethod}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select payout method" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white">
                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                         <SelectItem value="paypal">PayPal</SelectItem>
                         <SelectItem value="stripe">Stripe</SelectItem>
@@ -247,6 +247,7 @@ export default function PayoutsPage() {
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Any additional information..."
                       rows={3}
+                      className="bg-white"
                     />
                   </div>
                   
@@ -257,7 +258,7 @@ export default function PayoutsPage() {
                     </p>
                   </div>
                   
-                  <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full border">
                     Submit Payout Request
                   </Button>
                 </form>
@@ -266,11 +267,11 @@ export default function PayoutsPage() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader>
+        <Card className="bg-white">
+          <CardHeader className="bg-white">
             <CardTitle>Payout Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 bg-white">
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Payout Schedule</h4>
               <p className="text-sm text-muted-foreground">
@@ -294,7 +295,7 @@ export default function PayoutsPage() {
               </p>
             </div>
             
-            <Button variant="outline" className="w-full" asChild>
+            <Button variant="outline" className="w-full bg-white" asChild>
               <a href="/dashboard/settings">
                 Manage Payout Methods
               </a>
@@ -303,23 +304,23 @@ export default function PayoutsPage() {
         </Card>
       </div>
       
-      <div>
+      <div className="bg-white">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Payout History</h2>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="bg-white">
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
         </div>
         
         {payouts.length === 0 ? (
-          <div className="text-center py-10 border rounded-md bg-gray-50">
+          <div className="text-center py-10 border rounded-md bg-white">
             <p className="text-gray-500">No payout history available</p>
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border bg-white">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-white">
                 <TableRow>
                   <TableHead>Reference ID</TableHead>
                   <TableHead>Amount</TableHead>
@@ -329,9 +330,9 @@ export default function PayoutsPage() {
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="bg-white">
                 {payouts.map((payout) => (
-                  <TableRow key={payout.id}>
+                  <TableRow key={payout.id} className="bg-white">
                     <TableCell className="font-mono text-sm">{payout.id}</TableCell>
                     <TableCell className="font-medium">${payout.amount.toFixed(2)}</TableCell>
                     <TableCell>{formatMethodName(payout.method)}</TableCell>

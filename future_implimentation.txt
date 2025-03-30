@@ -1,0 +1,10 @@
+DASHBOARD IMPLEMENTATIONS
+
+Setting 
+  admin can edit profile,
+  admin can modify alert status in the setting,
+User 
+  Display users information,
+  view users comments and activities with use of pop up,
+  
+  

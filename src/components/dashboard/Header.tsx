@@ -1,14 +1,14 @@
- 'use client'
+'use client'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  Bell, 
-  Search, 
-  Menu, 
-  X, 
-  User, 
-  LogOut, 
+import {
+  Bell,
+  Search,
+  Menu,
+  X,
+  User,
+  LogOut,
   Settings,
   ChevronDown,
   ShoppingCart
@@ -36,18 +36,19 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sidebar } from './Sidebar'
 import { ThemeSwitcher } from '@/components/ThemeSwitcher'
-import { useTheme } from '@/app/context/ThemeContext'
+import { useTheme } from '../../context/ThemeContext'
+import SignOutButton from '../SignOutButton'
 
 export function Header({ user }: { user: { name?: string; email?: string; avatar?: string } }) {
   const pathname = usePathname()
   const [searchOpen, setSearchOpen] = useState(false)
   const { theme } = useTheme()
-  
+
   // Determine user role from path
   const isAdmin = pathname?.includes('/admin')
   const isVendor = pathname?.includes('/vendor')
   const userRole = isAdmin ? 'admin' : isVendor ? 'vendor' : 'customer'
-  
+
   // Mock notifications
   const notifications = [
     {
@@ -72,7 +73,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
       read: true,
     },
   ]
-  
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       <Sheet>
@@ -86,11 +87,11 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
           <Sidebar className="px-2" />
         </SheetContent>
       </Sheet>
-      
+
       <Link href="/" className="flex items-center gap-2 md:gap-3">
         <span className="font-bold text-xl text-theme">MultiVendor</span>
       </Link>
-      
+
       <div className="relative md:flex-1 md:flex md:justify-center">
         {searchOpen ? (
           <div className="absolute inset-0 flex items-center bg-background md:relative md:w-2/3 md:mx-auto">
@@ -99,10 +100,10 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
               placeholder="Search..."
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-theme"
             />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="absolute right-0" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0"
               onClick={() => setSearchOpen(false)}
             >
               <X className="h-4 w-4" />
@@ -110,17 +111,17 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
             </Button>
           </div>
         ) : (
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="ml-auto md:hidden" 
+          <Button
+            variant="outline"
+            size="icon"
+            className="ml-auto md:hidden"
             onClick={() => setSearchOpen(true)}
           >
             <Search className="h-4 w-4" />
             <span className="sr-only">Search</span>
           </Button>
         )}
-        
+
         <div className="hidden md:flex md:w-2/3 mx-auto relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
@@ -130,11 +131,11 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
           />
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2">
         {/* Theme Switcher */}
         <ThemeSwitcher />
-        
+
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="icon" className="relative">
@@ -145,7 +146,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
               <span className="sr-only">Notifications</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-0" align="end">
+          <PopoverContent className="w-80 p-0 bg-white" align="end">
             <div className="p-3 border-b">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Notifications</h4>
@@ -162,8 +163,8 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
               ) : (
                 <div className="grid gap-1">
                   {notifications.map((notification) => (
-                    <div 
-                      key={notification.id} 
+                    <div
+                      key={notification.id}
                       className={`p-3 hover:bg-muted ${notification.read ? '' : 'bg-theme-50'}`}
                     >
                       <div className="flex items-start gap-3">
@@ -190,22 +191,10 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
             </div>
           </PopoverContent>
         </Popover>
-        
-        {userRole === 'customer' && (
-          <Button variant="outline" size="icon" asChild>
-            <Link href="/cart">
-              <ShoppingCart className="h-4 w-4" />
-              <span className="sr-only">Cart</span>
-              <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-theme text-white">
-                3
-              </Badge>
-            </Link>
-          </Button>
-        )}
-        
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="pl-2 pr-3 h-9">
+            <Button variant="outline" size="sm" className="pl-2 pr-3 h-9 ">
               <Avatar className="h-6 w-6 mr-2 border border-theme-200">
                 <AvatarImage src={user?.avatar || ''} alt={user?.name || 'User'} />
                 <AvatarFallback className="bg-theme-100 text-theme-800">{user?.name?.charAt(0) || 'U'}</AvatarFallback>
@@ -214,7 +203,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
               <ChevronDown className="ml-2 h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-56 bg-blue-500 text-white">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
@@ -225,7 +214,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/dashboard/profile" className="cursor-pointer">
+              <Link href="/" className="cursor-pointer">
                 <User className="mr-2 h-4 w-4 text-theme-500" />
                 Profile
               </Link>
@@ -238,10 +227,7 @@ export function Header({ user }: { user: { name?: string; email?: string; avatar
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/logout" className="cursor-pointer text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                Log out
-              </Link>
+              <SignOutButton />
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

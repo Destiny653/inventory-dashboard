@@ -1,7 +1,7 @@
 // components/ThemeSwitcher.tsx
 "use client"
 
-import { useTheme, ThemeType } from '@/app/context/ThemeContext'
+import { useTheme, ThemeType } from '../context/ThemeContext'
 import { Check, Palette } from 'lucide-react'
 import {
   DropdownMenu,
