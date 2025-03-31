@@ -19,6 +19,7 @@ import { useTheme } from '@/context/ThemeContext'
 const vendorLinks = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/dashboard/products', icon: Package },
+  { name: 'Customers', href: '/dashboard/users', icon: Users },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Stock Alerts', href: '/dashboard/stock-alerts', icon: AlertTriangle },
