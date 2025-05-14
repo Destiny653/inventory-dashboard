@@ -37,6 +37,8 @@ interface Product {
   stock_quantity: number
   category_id: string | null
   image_url: string
+  slug: string
+  avg_rating: number
 }
 
 interface PendingProduct {
@@ -47,6 +49,8 @@ interface PendingProduct {
   stock_quantity: string
   category_id: string
   image_url: string
+  slug: string
+  avg_rating: string
   imagePreview?: string
   imageFile?: File
 }
@@ -73,6 +77,8 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
     stock_quantity: editProduct?.stock_quantity?.toString() || '',
     category_id: editProduct?.category_id || '',
     image_url: editProduct?.image_url || '',
+    slug: editProduct?.slug || '',
+    avg_rating: editProduct?.avg_rating?.toString() || '0',
   }
 
   const [formData, setFormData] = useState(initialFormState)
@@ -167,6 +173,15 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
     }
   }
 
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/--+/g, '-')
+      .trim()
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
@@ -183,9 +198,12 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
       return
     }
 
+    const slug = formData.slug || generateSlug(formData.name)
+
     const newProduct: PendingProduct = {
       id: uuidv4(),
       ...formData,
+      slug,
       imagePreview: imagePreview || undefined,
       imageFile: imageFile || undefined,
     }
@@ -223,170 +241,200 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
       if (uploadError) throw uploadError
       
       const { data: publicUrlData } = supabase.storage
-        .from('products')
-        .getPublicUrl(filePath)
-      
-      return publicUrlData.publicUrl
-    } catch (error) {
-      throw error
-    }
-  }
-
-  const updateProduct = async () => {
-    if (!editProduct?.id) return
+      .from('products')
+      .getPublicUrl(filePath)
     
-    setLoading(true)
-    setError(null)
+    return publicUrlData.publicUrl
+  } catch (error) {
+    throw error
+  }
+}
 
-    try {
-      let imageUrl = formData.image_url
+const updateProduct = async () => {
+  if (!editProduct?.id) return
+  
+  setLoading(true)
+  setError(null)
 
-      if (imageFile) {
-        imageUrl = await uploadImage(imageFile)
-      }
+  try {
+    let imageUrl = formData.image_url
 
-      const updatedData = {
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity),
-        category_id: formData.category_id === "none" ? null : formData.category_id,
-        image_url: imageUrl,
-      }
-
-      const { error } = await supabase
-        .from('products')
-        .update(updatedData)
-        .eq('id', editProduct.id)
-
-      if (error) throw error
-
-      toast.success('Product updated successfully')
-      onSubmitSuccess()
-    } catch (error: any) {
-      console.error('Error updating product:', error)
-      setError(error.message)
-      toast.error('Failed to update product')
-    } finally {
-      setLoading(false)
+    if (imageFile) {
+      imageUrl = await uploadImage(imageFile)
     }
+
+    const updatedData = {
+      name: formData.name,
+      description: formData.description,
+      price: parseFloat(formData.price),
+      stock_quantity: parseInt(formData.stock_quantity),
+      category_id: formData.category_id === "none" ? null : formData.category_id,
+      image_url: imageUrl,
+      slug: formData.slug || generateSlug(formData.name),
+      avg_rating: parseFloat(formData.avg_rating) || 0,
+    }
+
+    const { error } = await supabase
+      .from('products')
+      .update(updatedData)
+      .eq('id', editProduct.id)
+
+    if (error) throw error
+
+    toast.success('Product updated successfully')
+    onSubmitSuccess()
+  } catch (error: any) {
+    console.error('Error updating product:', error)
+    setError(error.message)
+    toast.error('Failed to update product')
+  } finally {
+    setLoading(false)
+  }
+}
+
+const submitAllProducts = async () => {
+  if (pendingProducts.length === 0) {
+    toast.error('No products to submit')
+    return
   }
 
-  const submitAllProducts = async () => {
-    if (pendingProducts.length === 0) {
-      toast.error('No products to submit')
-      return
-    }
+  setLoading(true)
+  setError(null)
 
-    setLoading(true)
-    setError(null)
+  try {
+    const productsToInsert = await Promise.all(
+      pendingProducts.map(async (product) => {
+        let imageUrl = product.image_url
 
-    try {
-      const productsToInsert = await Promise.all(
-        pendingProducts.map(async (product) => {
-          let imageUrl = product.image_url
+        if (product.imageFile) {
+          imageUrl = await uploadImage(product.imageFile)
+        }
 
-          if (product.imageFile) {
-            imageUrl = await uploadImage(product.imageFile)
-          }
+        return {
+          name: product.name,
+          description: product.description,
+          price: parseFloat(product.price),
+          stock_quantity: parseInt(product.stock_quantity),
+          category_id: product.category_id === "none" ? null : product.category_id,
+          image_url: imageUrl,
+          slug: product.slug || generateSlug(product.name),
+          avg_rating: parseFloat(product.avg_rating) || 0,
+        }
+      })
+    )
 
-          return {
-            name: product.name,
-            description: product.description,
-            price: parseFloat(product.price),
-            stock_quantity: parseInt(product.stock_quantity),
-            category_id: product.category_id === "none" ? null : product.category_id,
-            image_url: imageUrl,
-          }
-        })
-      )
+    const { error } = await supabase
+      .from('products')
+      .insert(productsToInsert)
 
-      const { error } = await supabase
-        .from('products')
-        .insert(productsToInsert)
+    if (error) throw error
 
-      if (error) throw error
-
-      setPendingProducts([])
-      localStorage.removeItem(STORAGE_KEY)
-      onSubmitSuccess()
-      toast.success('All products uploaded successfully')
-    } catch (error: any) {
-      console.error('Error saving products:', error)
-      setError(error.message)
-      toast.error('Failed to upload products')
-    } finally {
-      setLoading(false)
-    }
+    setPendingProducts([])
+    localStorage.removeItem(STORAGE_KEY)
+    onSubmitSuccess()
+    toast.success('All products uploaded successfully')
+  } catch (error: any) {
+    console.error('Error saving products:', error)
+    setError(error.message)
+    toast.error('Failed to upload products')
+  } finally {
+    setLoading(false)
   }
+}
 
-  return (
-    <div className="flex flex-col gap-6 h-full max-h-[calc(100vh-2rem)] overflow-y-auto p-4">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>
-            {editProduct ? 'Edit Product' : 'Add New Products'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 text-red-500 p-4 rounded-md text-sm border border-red-200">
-                {error}
+return (
+  <div className="flex flex-col gap-6 h-full max-h-[calc(100vh-2rem)] overflow-y-auto p-4">
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>
+          {editProduct ? 'Edit Product' : 'Add New Products'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 text-red-500 p-4 rounded-md text-sm border border-red-200">
+              {error}
+            </div>
+          )}
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Product Name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
-            )}
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
+              
+              <div className="space-y-2">
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  name="slug"
+                  value={formData.slug}
+                  onChange={handleChange}
+                  placeholder="Will be generated from name if empty"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={5}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Product Name</Label>
+                  <Label htmlFor="price">Price ($)</Label>
                   <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
+                    id="price"
+                    name="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
                     onChange={handleChange}
                     required
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
+                  <Label htmlFor="stock_quantity">Stock</Label>
+                  <Input
+                    id="stock_quantity"
+                    name="stock_quantity"
+                    type="number"
+                    min="0"
+                    value={formData.stock_quantity}
                     onChange={handleChange}
-                    rows={5}
+                    required
                   />
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price ($)</Label>
-                    <Input
-                      id="price"
-                      name="price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.price}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="stock_quantity">Stock</Label>
-                    <Input
-                      id="stock_quantity"
-                      name="stock_quantity"
-                      type="number"
-                      min="0"
-                      value={formData.stock_quantity}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="avg_rating">Average Rating</Label>
+                  <Input
+                    id="avg_rating"
+                    name="avg_rating"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5"
+                    value={formData.avg_rating}
+                    onChange={handleChange}
+                  />
                 </div>
                 
                 <div className="space-y-2 bg-white">
@@ -409,148 +457,151 @@ export default function ProductForm({ editProduct, onSubmitSuccess }: ProductFor
                   </Select>
                 </div>
               </div>
-              
-              <div className="space-y-4">
-                <Label>Product Image</Label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                  
-                  {!imagePreview ? (
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex flex-col items-center justify-center h-48 cursor-pointer"
-                    >
-                      <ImageIcon className="h-8 w-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">Click to upload image</p>
-                      <p className="text-xs text-gray-400">PNG, JPG, GIF up to 5MB</p>
-                    </div>
-                  ) : (
-                    <div className="relative h-48">
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview"
-                        className="h-full w-full object-contain rounded-md"
-                      />
-                      <button 
-                        type="button"
-                        onClick={handleRemoveImage}
-                        className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-md"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
             
-            <div className="flex gap-4 pt-4">
-              {editProduct ? (
-                <Button 
-                  type="submit"
-                  disabled={loading}
-                  className="w-full  border"
+            <div className="space-y-4">
+              <Label>Product Image</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                
+                {!imagePreview ? (
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center h-48 cursor-pointer"
+                  >
+                    <ImageIcon className="h-8 w-8 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Click to upload image</p>
+                    <p className="text-xs text-gray-400">PNG, JPG, GIF up to 5MB</p>
+                  </div>
+                ) : (
+                  <div className="relative h-48">
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview"
+                      className="h-full w-full object-contain rounded-md"
+                    />
+                    <button 
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-md"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex gap-4 pt-4">
+            {editProduct ? (
+              <Button 
+                type="submit"
+                disabled={loading}
+                className="w-full border"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Product'
+                )}
+              </Button>
+            ) : (
+              <>
+                <Button type="submit" className="flex-1">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to Queue
+                </Button>
+                
+                <Button
+                  type="button"
+                  onClick={submitAllProducts}
+                  disabled={loading || pendingProducts.length === 0}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
+                      Uploading...
                     </>
                   ) : (
-                    'Update Product'
+                    `Upload All (${pendingProducts.length})`
                   )}
                 </Button>
-              ) : (
-                <>
-                  <Button type="submit" className="flex-1">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Queue
-                  </Button>
-                  
-                  <Button
-                    type="button"
-                    onClick={submitAllProducts}
-                    disabled={loading || pendingProducts.length === 0}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      `Upload All (${pendingProducts.length})`
-                    )}
-                  </Button>
-                </>
-              )}
+              </>
+            )}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+
+    {!editProduct && pendingProducts.length > 0 && (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Pending Products ({pendingProducts.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="max-h-[300px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        {product.imagePreview ? (
+                          <img 
+                            src={product.imagePreview} 
+                            alt={product.name}
+                            className="h-12 w-12 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>{product.name}</TableCell>
+                      <TableCell>${product.price}</TableCell>
+                      <TableCell>{product.stock_quantity}</TableCell>
+                      <TableCell>{product.avg_rating}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removePendingProduct(product.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
-
-      {!editProduct && pendingProducts.length > 0 && (
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Pending Products ({pendingProducts.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <div className="max-h-[300px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Image</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          {product.imagePreview ? (
-                            <img 
-                              src={product.imagePreview} 
-                              alt={product.name}
-                              className="h-12 w-12 object-cover rounded"
-                            />
-                          ) : (
-                            <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center">
-                              <ImageIcon className="h-6 w-6 text-gray-400" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell>${product.price}</TableCell>
-                        <TableCell>{product.stock_quantity}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removePendingProduct(product.id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
+    )}
+  </div>
+)
 }

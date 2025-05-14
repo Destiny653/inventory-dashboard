@@ -27,6 +27,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [products, setProducts] = useState<{
+    slug: string
     id: number;
     name: string;
     description?: string;
@@ -41,7 +42,7 @@ export default function ProductsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const itemsPerPage = 9
+  const itemsPerPage = 10
 
   useEffect(() => {
     fetchProducts()
@@ -301,6 +302,8 @@ export default function ProductsPage() {
                             <ProductForm
                               editProduct={{
                                 id: product.id.toString(),
+                                slug: product.slug,
+                                avg_rating: product.avg_rating,
                                 name: product.name,
                                 description: product.description || '',
                                 price: product.price,
