@@ -348,7 +348,7 @@ export default function UsersPage() {
                             {formatDate(user.created_at)}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className='bg-[#fff]'>
                           {renderActionsCell(user)}
                         </TableCell>
                       </TableRow>
