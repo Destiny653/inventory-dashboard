@@ -1,7 +1,7 @@
  'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,14 +23,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
-interface OrderDetails {
+interface Order {
   id: string
   status: string
   total_amount: number
   created_at: string
   updated_at: string
   user_id: string
+  payment_method?: string
+  shipping_method?: string
   shipping_address: {
     fullName: string
     addressLine1: string
@@ -51,13 +54,12 @@ interface OrderDetails {
     country: string
     phoneNumber?: string
   }
-  payment_method: string | null
   payment_status: string
   payment_intent_id: string | null
-  shipping_method: string
   user?: {
     email: string
     full_name?: string
+    avatar_url?: string
   }
   items?: {
     id: string
@@ -68,48 +70,33 @@ interface OrderDetails {
   }[]
 }
 
-interface PageProps {
-  params: {
-    id: string
-  }
-}
-
-export default function OrderDetailPage({ params }: PageProps) {
-  const { id } = params
+export default function OrderDetailPage() {
   const router = useRouter()
-  const [order, setOrder] = useState<OrderDetails | null>(null)
+  const params = useParams()
+  const { id } = params as { id: string }
+  const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
-    if (!id || !isUUID(id)) {
+    if (!id) {
       setError('Invalid order ID')
       setLoading(false)
-      router.push('/orders')
       return
     }
-    fetchOrderDetails()
+    fetchOrderWithUser()
   }, [id])
 
-  async function fetchOrderDetails() {
+  async function fetchOrderWithUser() {
     try {
       setLoading(true)
       setError(null)
       
+      // First fetch the order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          user_profiles:user_id (email, full_name),
-          order_items:order_items (
-            id,
-            product_id,
-            quantity,
-            price_at_time,
-            products:product_id (name)
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .single()
 
@@ -119,13 +106,35 @@ export default function OrderDetailPage({ params }: PageProps) {
         return
       }
 
+      // Then fetch the user profile
+      const { data: userProfile, error: userError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', orderData.user_id)
+        .single()
+
+      if (userError) throw userError
+
+      // Fetch order items with product names
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          products:product_id (name)
+        `)
+        .eq('order_id', id)
+
+      if (itemsError) throw itemsError
+
+      // Combine all the data
       const formattedOrder = {
         ...orderData,
-        user: {
-          email: orderData.user_profiles?.email || 'Unknown',
-          full_name: orderData.user_profiles?.full_name || 'Unknown'
+        user: userProfile || {
+          email: 'Unknown',
+          full_name: orderData.shipping_address?.fullName || 'Customer',
+          avatar_url: null
         },
-        items: orderData.order_items?.map((item: any) => ({
+        items: orderItems?.map(item => ({
           ...item,
           product_name: item.products?.name || 'Unknown product'
         })) || []
@@ -135,54 +144,15 @@ export default function OrderDetailPage({ params }: PageProps) {
     } catch (error) {
       console.error('Error loading order:', error)
       setError('Failed to load order details')
+      toast.error('Failed to load order details')
     } finally {
       setLoading(false)
     }
   }
 
-  function formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  function getStatusBadgeColor(status: string): string {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
-      case 'processing':
-        return 'bg-blue-100 text-blue-800 hover:bg-blue-100'
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800 hover:bg-purple-100'
-      case 'delivered':
-        return 'bg-green-100 text-green-800 hover:bg-green-100'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 hover:bg-red-100'
-      default:
-        return 'bg-gray-100 text-gray-800 hover:bg-gray-100'
-    }
-  }
-
-  function getPaymentStatusColor(status: string): string {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return 'text-green-600'
-      case 'pending':
-        return 'text-yellow-600'
-      case 'failed':
-        return 'text-red-600'
-      case 'refunded':
-        return 'text-blue-600'
-      default:
-        return 'text-gray-600'
-    }
-  }
-
   async function updateOrderStatus(newStatus: string) {
+    if (!order) return
+
     try {
       setUpdating(true)
       const { error } = await supabase
@@ -191,7 +161,7 @@ export default function OrderDetailPage({ params }: PageProps) {
           status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('id', order?.id)
+        .eq('id', order.id)
 
       if (error) throw error
 
@@ -209,9 +179,35 @@ export default function OrderDetailPage({ params }: PageProps) {
     }
   }
 
-  function isUUID(id: string) {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-    return uuidRegex.test(id)
+  function formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  function getStatusBadgeColor(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+      case 'processing': return 'bg-blue-100 text-blue-800 hover:bg-blue-100'
+      case 'shipped': return 'bg-purple-100 text-purple-800 hover:bg-purple-100'
+      case 'delivered': return 'bg-green-100 text-green-800 hover:bg-green-100'
+      case 'cancelled': return 'bg-red-100 text-red-800 hover:bg-red-100'
+      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-100'
+    }
+  }
+
+  function getPaymentStatusColor(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'paid': return 'text-green-600'
+      case 'pending': return 'text-yellow-600'
+      case 'failed': return 'text-red-600'
+      case 'refunded': return 'text-blue-600'
+      default: return 'text-gray-600'
+    }
   }
 
   if (loading) {
@@ -229,14 +225,14 @@ export default function OrderDetailPage({ params }: PageProps) {
         <Button
           variant="outline"
           className="mb-6"
-          onClick={() => router.push('/orders')}
+          onClick={() => router.push('/dashboard/orders')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Orders
         </Button>
         <div className="flex flex-col items-center justify-center h-64">
           <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={() => router.push('/orders')}>
+          <Button onClick={() => router.push('/dashboard/orders')}>
             Return to Orders
           </Button>
         </div>
@@ -250,14 +246,14 @@ export default function OrderDetailPage({ params }: PageProps) {
         <Button
           variant="outline"
           className="mb-6"
-          onClick={() => router.push('/orders')}
+          onClick={() => router.push('/dashboard/orders')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Orders
         </Button>
         <div className="flex flex-col items-center justify-center h-64">
           <p className="text-gray-500 mb-4">No order data available</p>
-          <Button onClick={() => router.push('/orders')}>
+          <Button onClick={() => router.push('/dashboard/orders')}>
             Return to Orders
           </Button>
         </div>
@@ -270,7 +266,7 @@ export default function OrderDetailPage({ params }: PageProps) {
       <Button
         variant="outline"
         className="mb-6"
-        onClick={() => router.push('/orders')}
+        onClick={() => router.push('/dashboard/orders')}
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Orders
@@ -291,28 +287,28 @@ export default function OrderDetailPage({ params }: PageProps) {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h3 className="font-medium text-gray-500">Order Date</h3>
+                    <p className="text-sm text-muted-foreground">Order Date</p>
                     <p>{formatDate(order.created_at)}</p>
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-500">Last Updated</h3>
+                    <p className="text-sm text-muted-foreground">Last Updated</p>
                     <p>{formatDate(order.updated_at)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h3 className="font-medium text-gray-500">Payment Method</h3>
+                    <p className="text-sm text-muted-foreground">Payment Method</p>
                     <p>{order.payment_method || 'Not specified'}</p>
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-500">Payment Status</h3>
+                    <p className="text-sm text-muted-foreground">Payment Status</p>
                     <p className={getPaymentStatusColor(order.payment_status)}>
                       {order.payment_status}
                     </p>
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-500">Shipping Method</h3>
+                  <p className="text-sm text-muted-foreground">Shipping Method</p>
                   <p>{order.shipping_method}</p>
                 </div>
               </div>
@@ -364,16 +360,16 @@ export default function OrderDetailPage({ params }: PageProps) {
               <CardTitle>Customer</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <Avatar>
+                  <AvatarImage src={order.user?.avatar_url || ''} />
+                  <AvatarFallback>
+                    {order.user?.full_name?.charAt(0) || 'C'}
+                  </AvatarFallback>
+                </Avatar>
                 <div>
-                  <h3 className="font-medium text-gray-500">Name</h3>
-                  <p>{order.user?.full_name || order.shipping_address.fullName}</p>
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-500">Email</h3>
-                  <p className="text-blue-600 hover:underline">
-                    <a href={`mailto:${order.user?.email}`}>{order.user?.email}</a>
-                  </p>
+                  <p className="font-medium">{order.user?.full_name || 'Customer'}</p>
+                  <p className="text-sm text-muted-foreground">{order.user?.email}</p>
                 </div>
               </div>
             </CardContent>
@@ -396,8 +392,8 @@ export default function OrderDetailPage({ params }: PageProps) {
                 </p>
                 <p>{order.shipping_address.country}</p>
                 {order.shipping_address.phoneNumber && (
-                  <p className="mt-2">
-                    <span className="font-medium">Phone:</span> {order.shipping_address.phoneNumber}
+                  <p className="text-sm text-muted-foreground">
+                    Phone: {order.shipping_address.phoneNumber}
                   </p>
                 )}
               </div>
@@ -421,8 +417,8 @@ export default function OrderDetailPage({ params }: PageProps) {
                 </p>
                 <p>{order.billing_address.country}</p>
                 {order.billing_address.phoneNumber && (
-                  <p className="mt-2">
-                    <span className="font-medium">Phone:</span> {order.billing_address.phoneNumber}
+                  <p className="text-sm text-muted-foreground">
+                    Phone: {order.billing_address.phoneNumber}
                   </p>
                 )}
               </div>

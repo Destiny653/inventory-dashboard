@@ -465,7 +465,7 @@ export default function OrdersPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Link href={`/orders/${order.id}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/dashboard/orders/${order.id}`} className="font-medium text-primary hover:underline">
                           #{order.id.split('-')[0]}
                         </Link>
                       </TableCell>
@@ -533,7 +533,7 @@ export default function OrdersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => router.push(`/orders/${order.id}`)}
+                            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
