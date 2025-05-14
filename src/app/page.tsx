@@ -1,12 +1,12 @@
  import React from 'react'
-import DashboardLayout from './dashboard/layout' 
-import LoginPage from './login/page';
+import DashboardLayout from './dashboard/layout'  
+import AccountPage from '@/components/dashboard/account';
  
  
 export default function Home() {
   return (
     <DashboardLayout> 
-      <LoginPage/>
+       <AccountPage/>
     </DashboardLayout>
   );
 }

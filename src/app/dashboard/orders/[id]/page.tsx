@@ -68,21 +68,25 @@ interface OrderDetails {
   }[]
 }
 
-export default function OrderDetailPage({
-  params
-}: {
-  params: { id: string }
-}) {
+interface PageProps {
+  params: {
+    id: string
+  }
+}
+
+export default function OrderDetailPage({ params }: PageProps) {
   const { id } = params
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     if (!id || !isUUID(id)) {
       setError('Invalid order ID')
       setLoading(false)
+      router.push('/orders')
       return
     }
     fetchOrderDetails()
@@ -93,7 +97,6 @@ export default function OrderDetailPage({
       setLoading(true)
       setError(null)
       
-      console.log('Fetching order:', id) // Debug
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -109,8 +112,6 @@ export default function OrderDetailPage({
         `)
         .eq('id', id)
         .single()
-
-      console.log('Query results:', { data: orderData, error: orderError }) // Debug
 
       if (orderError) throw orderError
       if (!orderData) {
@@ -132,7 +133,7 @@ export default function OrderDetailPage({
 
       setOrder(formattedOrder)
     } catch (error) {
-      console.error('Full error:', error)
+      console.error('Error loading order:', error)
       setError('Failed to load order details')
     } finally {
       setLoading(false)
@@ -179,6 +180,38 @@ export default function OrderDetailPage({
       default:
         return 'text-gray-600'
     }
+  }
+
+  async function updateOrderStatus(newStatus: string) {
+    try {
+      setUpdating(true)
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order?.id)
+
+      if (error) throw error
+
+      setOrder(prev => prev ? { 
+        ...prev, 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      } : null)
+      toast.success(`Order status updated to ${newStatus}`)
+    } catch (error) {
+      console.error('Error updating order status:', error)
+      toast.error('Failed to update order status')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  function isUUID(id: string) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    return uuidRegex.test(id)
   }
 
   if (loading) {
@@ -231,28 +264,8 @@ export default function OrderDetailPage({
       </div>
     )
   }
-  const [updating, setUpdating] = useState(false)
 
-  async function updateOrderStatus(newStatus: string) {
-    try {
-      setUpdating(true)
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', order?.id)
-
-      if (error) throw error
-
-      setOrder(prev => prev ? { ...prev, status: newStatus } : null)
-      toast.success(`Order status updated to ${newStatus}`)
-    } catch (error) {
-      console.error('Error updating order status:', error)
-      toast.error('Failed to update order status')
-    } finally {
-      setUpdating(false)
-    }
-  }
- return (
+  return (
     <div className="container mx-auto py-8 px-4">
       <Button
         variant="outline"
@@ -454,9 +467,4 @@ export default function OrderDetailPage({
       </div>
     </div>
   )
-
-}
-function isUUID(id: string) {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(id);
 }
