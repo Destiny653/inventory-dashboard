@@ -1,5 +1,5 @@
 // app/api/send-email/route.ts
-import { NextResponse } from 'next/server' 
+import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 
 export async function POST(request: Request) {
