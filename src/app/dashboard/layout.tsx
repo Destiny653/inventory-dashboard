@@ -41,7 +41,7 @@ export default function DashboardLayout({
         <Sidebar />
       </div>
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header user={{ name: '', email: '', avatar: '' }} />
+        <Header user={{ name: user.full_name, email: user.email, avatar: user.avatar_url }} />
         <main className="flex-1 overflow-y-auto p-4 bg-theme-50 dark:bg-theme-900">
           {children}
         </main>
