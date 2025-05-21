@@ -187,66 +187,69 @@ export default function AnalyticsPage() {
 
   // Fixed version of generateCategoryDistribution
   function generateCategoryDistribution(orders: any[], categories: any[]): CategoryData[] {
-    const categorySales: Record<string, number> = {};
+    const categorySales = new Map<string, number>();
 
+    
+  
     // Initialize all categories with 0 sales
     categories.forEach(category => {
-      categorySales[category.id] = 0;
+      categorySales.set(category.id, 0);
     });
-
-    // Debug: Log the first few order items to check structure
-    console.log('Sample order items:', orders.slice(0, 3).map(o => ({
-      id: o.id,
-      items: o.order_items?.map((i: any) => ({
-        product: i.products?.name,
-        category: i.products?.categories?.name,
-        price: i.price,
-        quantity: i.quantity
-      }))
-    })));
-
+  
+    // Debug: Log the structure of the first order
+    if (orders.length > 0) {
+      console.log('First order structure:', JSON.stringify({
+        id: orders[0].id,
+        items: orders[0].order_items?.map((i: any) => ({
+          product_id: i.product_id,
+          product_name: i.products?.name,
+          category_id: i.products?.categories?.id,
+          category_name: i.products?.categories?.name,
+          price: i.price,
+          quantity: i.quantity
+        }))
+      }, null, 2));
+    }
+  
     // Aggregate sales by category
-    orders.forEach(order => {
-      if (!order.order_items || !Array.isArray(order.order_items)) return;
-
-      order.order_items.forEach((item: any) => {
-        // Check if item has product and product has category
-        if (item.products?.categories?.id) {
-          const categoryId = item.products.categories.id;
-          const saleAmount = (Number(item.price) || 0) * (Number(item.quantity) || 0);
-
-          if (categoryId in categorySales) {
-            categorySales[categoryId] += saleAmount;
-          }
+    for (const order of orders) {
+      if (!order.order_items || !Array.isArray(order.order_items)) continue;
+  
+      for (const item of order.order_items) {
+        // Skip if missing critical data
+        if (!item.products?.categories?.id) {
+          console.warn('Missing category data for item:', {
+            item_id: item.id,
+            product_id: item.product_id,
+            has_product: !!item.products,
+            has_category: !!item.products?.categories
+          });
+          continue;
         }
-      });
-    });
-
-    // Convert to array of objects and sort by sales
-    const result = categories
-      .map(category => ({
-        name: category.name,
-        value: categorySales[category.id] || 0
+  
+        const categoryId = item.products.categories.id;
+        const price = parseFloat(item.price) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        const saleAmount = price * quantity;
+  
+        if (categorySales.has(categoryId)) {
+          categorySales.set(categoryId, categorySales.get(categoryId)! + saleAmount);
+        } else {
+          console.warn(`Found item with unknown category ID: ${categoryId}`);
+        }
+      }
+    }
+  
+    // Convert to array and filter/sort
+    const result = Array.from(categorySales.entries())
+      .map(([id, value]) => ({
+        name: categories.find(c => c.id === id)?.name || `Unknown Category (${id})`,
+        value
       }))
       .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value);
-
-    console.log('Processed category sales:', result);
-    // Add this test case right before the return statement
-    if (result.length === 0) {
-      console.warn('No category sales found. Sample data test:');
-      const testData = [{
-        order_items: [{
-          price: 100,
-          quantity: 2,
-          products: {
-            categories: categories[0] // Use first category
-          }
-        }]
-      }];
-      const testResult = generateCategoryDistribution(testData, categories);
-      console.log('Test result:', testResult);
-    }
+  
+    console.log('Final category sales:', result);
     return result;
   }
   // Helper function to generate top products
