@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -67,22 +67,24 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
-  
+
+  console.log("scategorydata: ", categoryData)
+
   useEffect(() => {
     fetchAnalyticsData()
-    
+
     const handleResize = () => {
       setWindowWidth(window.innerWidth)
     }
-    
+
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
-  
+
   async function fetchAnalyticsData() {
     setLoading(true)
     setError(null)
-    
+
     try {
       // Fetch all necessary data in parallel
       const [
@@ -119,11 +121,11 @@ export default function AnalyticsPage() {
       const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
       const totalOrders = orders.length
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-      
+
       // Calculate growth rate compared to previous month
       const prevMonthRevenue = previousMonthOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
-      const growthRate = prevMonthRevenue > 0 
-        ? ((totalRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 
+      const growthRate = prevMonthRevenue > 0
+        ? ((totalRevenue - prevMonthRevenue) / prevMonthRevenue) * 100
         : 100
 
       setStats({
@@ -137,8 +139,9 @@ export default function AnalyticsPage() {
       const monthlySales = generateMonthlySales(orders)
       setSalesData(monthlySales)
 
-      // Generate category distribution
-      const categoryDistribution = generateCategoryDistribution(orders, categories)
+      // Generate category distribution - FIXED THIS FUNCTION
+      const categoryDistribution = generateCategoryDistribution(orders.flat(), categories)
+      console.log({ orders, categories })
       setCategoryData(categoryDistribution)
 
       // Generate top products
@@ -156,20 +159,20 @@ export default function AnalyticsPage() {
   function generateMonthlySales(orders: any[]): SalesData[] {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const salesByMonth: Record<string, number> = {}
-    
+
     // Initialize all months with 0 sales
     months.forEach(month => {
       salesByMonth[month] = 0
     })
-    
+
     // Aggregate sales by month
     orders.forEach(order => {
       if (!order.created_at) return
-      
+
       const month = new Date(order.created_at).toLocaleString('default', { month: 'short' })
       salesByMonth[month] = (salesByMonth[month] || 0) + (order.total_amount || 0)
     })
-    
+
     // Convert to array of objects for the current year
     const currentYear = new Date().getFullYear()
     return months.map(month => ({
@@ -182,46 +185,83 @@ export default function AnalyticsPage() {
     })
   }
 
-  // Helper function to generate category distribution
+  // Fixed version of generateCategoryDistribution
   function generateCategoryDistribution(orders: any[], categories: any[]): CategoryData[] {
-    const categorySales: Record<string, number> = {}
-    
+    const categorySales: Record<string, number> = {};
+
     // Initialize all categories with 0 sales
     categories.forEach(category => {
-      categorySales[category.id] = 0
-    })
-    
+      categorySales[category.id] = 0;
+    });
+
+    // Debug: Log the first few order items to check structure
+    console.log('Sample order items:', orders.slice(0, 3).map(o => ({
+      id: o.id,
+      items: o.order_items?.map((i: any) => ({
+        product: i.products?.name,
+        category: i.products?.categories?.name,
+        price: i.price,
+        quantity: i.quantity
+      }))
+    })));
+
     // Aggregate sales by category
     orders.forEach(order => {
-      order.order_items?.forEach((item: any) => {
-        const categoryId = item.products?.categories?.id
-        if (categoryId) {
-          categorySales[categoryId] = (categorySales[categoryId] || 0) + (item.price * item.quantity || 0)
+      if (!order.order_items || !Array.isArray(order.order_items)) return;
+
+      order.order_items.forEach((item: any) => {
+        // Check if item has product and product has category
+        if (item.products?.categories?.id) {
+          const categoryId = item.products.categories.id;
+          const saleAmount = (Number(item.price) || 0) * (Number(item.quantity) || 0);
+
+          if (categoryId in categorySales) {
+            categorySales[categoryId] += saleAmount;
+          }
         }
-      })
-    })
-    
+      });
+    });
+
     // Convert to array of objects and sort by sales
-    return categories
+    const result = categories
       .map(category => ({
         name: category.name,
         value: categorySales[category.id] || 0
       }))
-      .filter(item => item.value > 0) // Only show categories with sales
-      .sort((a, b) => b.value - a.value) // Sort by sales descending
-  }
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value);
 
+    console.log('Processed category sales:', result);
+    // Add this test case right before the return statement
+    if (result.length === 0) {
+      console.warn('No category sales found. Sample data test:');
+      const testData = [{
+        order_items: [{
+          price: 100,
+          quantity: 2,
+          products: {
+            categories: categories[0] // Use first category
+          }
+        }]
+      }];
+      const testResult = generateCategoryDistribution(testData, categories);
+      console.log('Test result:', testResult);
+    }
+    return result;
+  }
   // Helper function to generate top products
   function generateTopProducts(orders: any[]): ProductData[] {
     const productSales: Record<string, { name: string; sales: number }> = {}
-    
+
     // Aggregate sales by product
     orders.forEach(order => {
-      order.order_items?.forEach((item: any) => {
+      if (!order.order_items) return
+
+      order.order_items.forEach((item: any) => {
         const productId = item.product_id
         const productName = item.products?.name || `Product ${productId}`
-        const saleAmount = item.price * item.quantity || 0
-        
+        const saleAmount = (item.price || 0) * (item.quantity || 0)
+
         if (productSales[productId]) {
           productSales[productId].sales += saleAmount
         } else {
@@ -232,19 +272,19 @@ export default function AnalyticsPage() {
         }
       })
     })
-    
+
     // Convert to array and sort by sales
     return Object.values(productSales)
       .sort((a, b) => b.sales - a.sales) // Sort by sales descending
       .slice(0, 10) // Get top 10 products
   }
-  
+
   // Custom label for pie chart that's responsive
   const renderPieLabel = ({ name, percent }: { name: string; percent: number }) => {
     if (windowWidth < 768) return null
     return `${name} ${(percent * 100).toFixed(0)}%`
   }
-  
+
   // Responsive product names for bar chart
   const getProductName = (name: string): string => {
     if (windowWidth < 640) {
@@ -252,7 +292,7 @@ export default function AnalyticsPage() {
     }
     return name
   }
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -268,7 +308,7 @@ export default function AnalyticsPage() {
         <div className="text-red-500 p-4 rounded-lg border border-red-200 bg-red-50 flex items-center">
           <AlertCircle className="h-5 w-5 mr-2" />
           {error}
-          <button 
+          <button
             onClick={fetchAnalyticsData}
             className="ml-4 px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
           >
@@ -282,7 +322,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Sales Analytics</h1>
-      
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
@@ -350,29 +390,29 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <Tabs defaultValue="sales" className="space-y-4">
         <TabsList className="w-full flex justify-between sm:justify-start sm:w-auto overflow-x-auto bg-gray-100 p-1 rounded-lg">
-          <TabsTrigger 
-            value="sales" 
+          <TabsTrigger
+            value="sales"
             className="flex-1 sm:flex-none data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-1.5 text-sm font-medium transition-all"
           >
             Sales Trends
           </TabsTrigger>
-          <TabsTrigger 
-            value="categories" 
+          <TabsTrigger
+            value="categories"
             className="flex-1 sm:flex-none data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-1.5 text-sm font-medium transition-all"
           >
             Categories
           </TabsTrigger>
-          <TabsTrigger 
-            value="products" 
+          <TabsTrigger
+            value="products"
             className="flex-1 sm:flex-none data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-1.5 text-sm font-medium transition-all"
           >
             Top Products
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="sales" className="space-y-4">
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="pb-0 sm:pb-2">
@@ -391,13 +431,13 @@ export default function AnalyticsPage() {
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="month" 
-                      tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }} 
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }}
                       stroke="#d1d5db"
                     />
-                    <YAxis 
-                      tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }} 
+                    <YAxis
+                      tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }}
                       width={windowWidth < 640 ? 30 : 40}
                       stroke="#d1d5db"
                     />
@@ -410,11 +450,11 @@ export default function AnalyticsPage() {
                       }}
                       formatter={(value) => [`$${value}`, 'Sales']}
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="sales" 
+                    <Line
+                      type="monotone"
+                      dataKey="sales"
                       stroke={COLORS.chartLine}
-                      activeDot={{ r: 6, fill: COLORS.chartLine }} 
+                      activeDot={{ r: 6, fill: COLORS.chartLine }}
                       strokeWidth={windowWidth < 640 ? 1.5 : 2}
                       dot={{ r: 3 }}
                     />
@@ -424,7 +464,7 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="categories" className="space-y-4">
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="pb-0 sm:pb-2">
@@ -445,9 +485,9 @@ export default function AnalyticsPage() {
                       label={renderPieLabel}
                     >
                       {categoryData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={COLORS.chartColors[index % COLORS.chartColors.length]} 
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS.chartColors[index % COLORS.chartColors.length]}
                         />
                       ))}
                     </Pie>
@@ -460,8 +500,8 @@ export default function AnalyticsPage() {
                       }}
                       formatter={(value) => [`$${value}`, 'Sales']}
                     />
-                    <Legend 
-                      layout={windowWidth < 768 ? "horizontal" : "vertical"} 
+                    <Legend
+                      layout={windowWidth < 768 ? "horizontal" : "vertical"}
                       verticalAlign={windowWidth < 768 ? "bottom" : "middle"}
                       align={windowWidth < 768 ? "center" : "right"}
                       wrapperStyle={windowWidth < 768 ? {} : { right: 0 }}
@@ -472,7 +512,7 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="products" className="space-y-4">
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="pb-0 sm:pb-2">
@@ -495,14 +535,14 @@ export default function AnalyticsPage() {
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      type="number" 
-                      tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }} 
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }}
                       stroke="#d1d5db"
                     />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
+                    <YAxis
+                      dataKey="name"
+                      type="category"
                       tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#6b7280' }}
                       width={windowWidth < 640 ? 60 : 100}
                       stroke="#d1d5db"
@@ -516,8 +556,8 @@ export default function AnalyticsPage() {
                       }}
                       formatter={(value) => [`$${value}`, 'Sales']}
                     />
-                    <Bar 
-                      dataKey="sales" 
+                    <Bar
+                      dataKey="sales"
                       fill={COLORS.chartBar}
                       radius={[4, 4, 0, 0]}
                     />
