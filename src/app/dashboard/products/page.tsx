@@ -27,6 +27,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [products, setProducts] = useState<{
+    category_id: null
     slug: string
     id: number;
     name: string;
@@ -308,7 +309,7 @@ export default function ProductsPage() {
                                 description: product.description || '',
                                 price: product.price,
                                 stock_quantity: product.stock_quantity,
-                                category_id: product.categories?.id || null,
+                                category_id: product.category_id || null,
                                 image_url: product.image_url || ''
                               }}
                               onSubmitSuccess={fetchProducts}

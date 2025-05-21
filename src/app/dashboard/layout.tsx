@@ -42,7 +42,7 @@ export default function DashboardLayout({
       </div>
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header user={{ name: user.user_metadata.full_name, email: user.email, avatar: user.user_metadata.avatar_url }} />
-        <main className="flex-1 overflow-y-auto p-4 bg-theme-50 dark:bg-theme-900">
+        <main className="flex-1 overflow-y-auto p-4 bg-theme-50 dark:bg-theme-900 w-full">
           {children}
         </main>
       </div>

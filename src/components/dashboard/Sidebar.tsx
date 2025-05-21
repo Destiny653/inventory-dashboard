@@ -46,7 +46,7 @@ export function Sidebar({ className }: { className?: string }) {
   const links = isAdmin ? adminLinks : vendorLinks
   
   return (
-    <div className={cn("w-64 h-full flex flex-col border-r border-theme-100 bg-blue-600  ", className)}>
+    <div className={cn("w-60 h-full flex flex-col border-r border-theme-100 bg-blue-600  ", className)}>
       <div className="p-4 border-b border-blue-500/30">
         <h1 className="text-xl font-bold text-white">
           {isAdmin ? 'Admin Dashboard' : 'Vendor Dashboard'}
