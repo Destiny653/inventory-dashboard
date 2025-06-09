@@ -22,8 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Plus, Minus, Trash, ShoppingCart, User, CreditCard, DollarSign, Mail, Phone, CheckCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { Textarea } from '@/components/ui/textarea'
-import Image from 'next/image'
+import { Textarea } from '@/components/ui/textarea' 
 
 interface Product {
   id: number;
@@ -60,6 +59,7 @@ export default function DirectSalesPage() {
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState(false)
   const [user, setUser] = useState<any>(null)
   
   // Search and filter states
@@ -70,6 +70,8 @@ export default function DirectSalesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalProducts, setTotalProducts] = useState(0)
   const itemsPerPage = 12
+  success && setTimeout(() => setSuccess(false), 2000)
+  error && setTimeout(() => setError(false), 2000)
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -211,9 +213,7 @@ export default function DirectSalesPage() {
                     : item
             )
         )
-    }
-
-  // ... (rest of your existing functions: removeFromCart, updateQuantity, handleSubmit, etc.)
+    } 
    const handleSubmit = async () => {
         try {
             setIsSubmitting(true)
@@ -227,7 +227,8 @@ export default function DirectSalesPage() {
                     id: item.id,
                     name: item.name,
                     price: item.price,
-                    quantity: item.quantity
+                    quantity: item.quantity,
+                    image_url: item.image_url || null
                 })),
                 subtotal,
                 tax,
@@ -319,7 +320,7 @@ export default function DirectSalesPage() {
                     <div
                       key={i}
                       className="border rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer flex flex-col"
-                      onClick={() => addToCart(product)}
+                      onClick={() => product.stock_quantity < 1 ? setError(true) :  addToCart(product)}
                     >
                       <div className="relative aspect-square mb-2 bg-gray-100 rounded-md overflow-hidden">
                         {product.image_url ? (
@@ -638,12 +639,20 @@ export default function DirectSalesPage() {
               </div>
             </div>
           )}
+          { error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg">
+              <div className="flex items-center">
+                <Trash className="h-5 w-5 mr-2" />
+                <span>Product is below treshhold!</span>
+              </div>
+            </div>
+          ) }
         </div>
       </div>
     </div>
   )
 }
-
+ 
 function Separator({ className }: { className?: string }) {
   return <div className={`border-t border-gray-200 ${className}`} />
 }

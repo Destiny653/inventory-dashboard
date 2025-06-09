@@ -18,10 +18,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
 } from '@/components/ui/dialog'
-import { Search, ChevronLeft, ChevronRight, FileText, User, CreditCard, Store, Mail, Phone } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, FileText, User, CreditCard, Store, Mail, Phone, ShoppingBag } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import Image from 'next/image'
 
 interface CompletedSale {
   id: string;
@@ -35,6 +35,7 @@ interface CompletedSale {
     name: string;
     quantity: number;
     price: number;
+    image_url?: string;
   }>;
   subtotal: number;
   tax: number;
@@ -43,7 +44,12 @@ interface CompletedSale {
   payment_method: string;
   payment_details?: any;
   staff_id?: string;
-  staff_name?: string;
+  staff_info?: {
+    id: string;
+    full_name: string;
+    email?: string;
+    phone?: string;
+  };
   is_in_person: boolean;
   notes?: string;
 }
@@ -62,50 +68,59 @@ export default function CompletedSalesPage() {
   }, [currentPage])
 
   async function fetchSales() {
-    try {
-      setLoading(true)
-      
-      // Base query - updated to join with user_profiles
-      let query = supabase
-        .from('completed_sales')
-        .select(`
-          *,
-          user_profiles:user_id (id, full_name)
-        `)
-        .order('transaction_date', { ascending: false })
-      
-      // Count query for pagination
-      const { count, error: countError } = await supabase
-        .from('completed_sales')
-        .select('*', { count: 'exact', head: true })
-      
-      if (countError) throw countError
-      setTotalCount(count || 0)
-      
-      // Fetch paginated data
-      const { data, error } = await query
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1)
-      
-      if (error) throw error
-      
-      // Map data to include staff name from user_profiles
-      const formattedData = data.map(sale => ({
-        ...sale,
-        staff_name: sale.user_profiles?.full_name || 'System'
-      }))
-      
-      setSales(formattedData || [])
-    } catch (error) {
-      console.error('Error fetching sales:', error)
-    } finally {
-      setLoading(false)
+  try {
+    setLoading(true);
+
+    // 1. Get paginated completed_sales
+    const { data: salesData, error: salesError, count } = await supabase
+      .from('completed_sales')
+      .select('*', { count: 'exact' })
+      .order('transaction_date', { ascending: false })
+      .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+
+    if (salesError) throw salesError;
+    setTotalCount(count || 0);
+
+    // 2. Get unique staff_ids
+    const uniqueStaffIds = [...new Set((salesData || []).map(sale => sale.staff_id).filter(Boolean))];
+
+    // 3. Fetch user profiles manually
+    let staffProfilesMap: Record<string, any> = {};
+    if (uniqueStaffIds.length > 0) {
+      const { data: staffProfiles, error: profilesError } = await supabase
+        .from('user_profiles') // <-- this is your view
+        .select('id, full_name, email, phone')
+        .in('id', uniqueStaffIds);
+
+      if (profilesError) throw profilesError;
+
+      // 4. Map profiles by ID for quick lookup
+      staffProfilesMap = (staffProfiles || []).reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {} as Record<string, any>);
     }
+
+    // 5. Attach staff info manually to each sale
+    const formattedSales = (salesData || []).map((sale) => ({
+      ...sale,
+      staff_info: sale.staff_id ? staffProfilesMap[sale.staff_id] : undefined
+    }));
+
+    setSales(formattedSales);
+  } catch (error) {
+    console.error('Error fetching sales:', error);
+  } finally {
+    setLoading(false);
   }
+}
+
 
   const filteredSales = sales.filter(sale => 
     sale.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     sale.customer_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sale.order_id?.toLowerCase().includes(searchTerm.toLowerCase())
+    sale.order_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sale.staff_info?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const totalPages = Math.ceil(totalCount / itemsPerPage)
@@ -132,7 +147,7 @@ export default function CompletedSalesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative flex-1">
           <Input
-            placeholder="Search sales by customer, email, or order ID..."
+            placeholder="Search by customer, staff, email, or order ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
@@ -153,15 +168,14 @@ export default function CompletedSalesPage() {
                 <TableHead className="text-gray-700 font-semibold">Order ID</TableHead>
                 <TableHead className="text-gray-700 font-semibold">Items</TableHead>
                 <TableHead className="text-gray-700 font-semibold">Total</TableHead>
-                <TableHead className="text-gray-700 font-semibold">Payment</TableHead>
-                <TableHead className="text-gray-700 font-semibold">Processed By</TableHead>
+                <TableHead className="text-gray-700 font-semibold">Staff</TableHead>
                 <TableHead className="text-gray-700 font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-10 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-10 text-gray-500">
                     No sales records found
                   </TableCell>
                 </TableRow>
@@ -188,12 +202,6 @@ export default function CompletedSalesPage() {
                     <TableCell className="font-semibold text-green-600">
                       {formatCurrency(sale.total)}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm">
-                        {getPaymentMethodIcon(sale.payment_method)}
-                        {sale.payment_method}
-                      </div>
-                    </TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center">
                         {sale.is_in_person ? (
@@ -201,7 +209,7 @@ export default function CompletedSalesPage() {
                         ) : (
                           <User className="h-4 w-4 mr-1 text-gray-500" />
                         )}
-                        {sale.staff_name}
+                        {sale.staff_info?.full_name || 'System'}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -282,121 +290,184 @@ export default function CompletedSalesPage() {
         </div>
       )}
 
-      {/* Sale Details Dialog */}
+      {/* Enhanced Sale Details Dialog */}
       {selectedSale && (
         <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
-          <DialogContent className="sm:max-w-[700px]">
+          <DialogContent className="sm:max-w-[800px] bg-white">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {selectedSale.is_in_person ? (
-                  <Store className="h-5 w-5 text-blue-500" />
-                ) : (
-                  <User className="h-5 w-5 text-gray-500" />
-                )}
-                <span>
-                  Sale Details - {selectedSale.order_id || 'In-Person Sale'}
-                </span>
+                <ShoppingBag className="h-5 w-5 text-blue-500" />
+                <span>Sale #{selectedSale.order_id || selectedSale.id.slice(0, 8)}</span>
               </DialogTitle>
               <DialogDescription>
-                Processed on {formatDate(selectedSale.transaction_date)} by {selectedSale.staff_name}
+                Processed on {formatDate(selectedSale.transaction_date)}
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              {/* Customer Information */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium mb-2">Customer Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center">
-                    <User className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{selectedSale.customer_name || 'Anonymous'}</span>
-                  </div>
-                  {selectedSale.customer_email && (
-                    <div className="flex items-center">
-                      <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>{selectedSale.customer_email}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column - Customer and Staff Info */}
+              <div className="space-y-4">
+                {/* Customer Information */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-medium mb-3 flex items-center">
+                    <User className="h-4 w-4 mr-2 text-blue-500" />
+                    Customer Information
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="font-medium">{selectedSale.customer_name || 'Anonymous'}</p>
                     </div>
-                  )}
-                  {selectedSale.customer_phone && (
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>{selectedSale.customer_phone}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Items List */}
-              <div>
-                <h3 className="font-medium mb-2">Items Purchased</h3>
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedSale.items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatCurrency(item.price)}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatCurrency(item.price * item.quantity)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              
-              {/* Payment Summary */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium mb-2">Payment Summary</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>{formatCurrency(selectedSale.subtotal)}</span>
-                  </div>
-                  {selectedSale.discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount:</span>
-                      <span>-{formatCurrency(selectedSale.discount)}</span>
-                    </div>
-                  )}
-                  {selectedSale.tax > 0 && (
-                    <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <span>{formatCurrency(selectedSale.tax)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold border-t pt-2 mt-2">
-                    <span>Total:</span>
-                    <span>{formatCurrency(selectedSale.total)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Payment Method:</span>
-                    <span className="flex items-center">
-                      {getPaymentMethodIcon(selectedSale.payment_method)}
-                      {selectedSale.payment_method}
-                    </span>
+                    {selectedSale.customer_email && (
+                      <div>
+                        <p className="text-sm text-gray-500">Email</p>
+                        <p className="font-medium">{selectedSale.customer_email}</p>
+                      </div>
+                    )}
+                    {selectedSale.customer_phone && (
+                      <div>
+                        <p className="text-sm text-gray-500">Phone</p>
+                        <p className="font-medium">{selectedSale.customer_phone}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Staff Information */}
+                {selectedSale.staff_info && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-medium mb-3 flex items-center">
+                      {selectedSale.is_in_person ? (
+                        <Store className="h-4 w-4 mr-2 text-green-500" />
+                      ) : (
+                        <User className="h-4 w-4 mr-2 text-purple-500" />
+                      )}
+                      Processed By
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm text-gray-500">Staff Name</p>
+                        <p className="font-medium">{selectedSale.staff_info.full_name}</p>
+                      </div>
+                      {selectedSale.staff_info.email && (
+                        <div>
+                          <p className="text-sm text-gray-500">Email</p>
+                          <p className="font-medium">{selectedSale.staff_info.email}</p>
+                        </div>
+                      )}
+                      {selectedSale.staff_info.phone && (
+                        <div>
+                          <p className="text-sm text-gray-500">Phone</p>
+                          <p className="font-medium">{selectedSale.staff_info.phone}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              {/* Notes */}
-              {selectedSale.notes && (
+
+              {/* Right Column - Products and Payment */}
+              <div className="space-y-4">
+                {/* Items List */}
                 <div>
-                  <h3 className="font-medium mb-2">Additional Notes</h3>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm text-gray-700">{selectedSale.notes}</p>
+                  <h3 className="font-medium mb-3 flex items-center">
+                    <ShoppingBag className="h-4 w-4 mr-2 text-blue-500" />
+                    Products Purchased ({selectedSale.items.length})
+                  </h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200 overflow-y-scroll overflow-scroll">
+                      <thead className="bg-gray-50 ">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200 ">
+                        {selectedSale.items.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              <div className="flex items-center">
+                                {item.image_url ? (
+                                  <div className="flex-shrink-0 h-10 w-10 mr-2">
+                                    <img
+                                      src={item.image_url}
+                                      alt={item.name}
+                                      width={40}
+                                      height={40}
+                                      className="rounded-md object-cover h-full w-full"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex-shrink-0 h-10 w-10 mr-2 bg-gray-100 rounded-md flex items-center justify-center">
+                                    <ShoppingBag className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                )}
+                                <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatCurrency(item.price)}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatCurrency(item.price * item.quantity)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              )}
+
+                {/* Payment Summary */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-medium mb-3 flex items-center">
+                    <CreditCard className="h-4 w-4 mr-2 text-blue-500" />
+                    Payment Summary
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(selectedSale.subtotal)}</span>
+                    </div>
+                    {selectedSale.discount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount:</span>
+                        <span>-{formatCurrency(selectedSale.discount)}</span>
+                      </div>
+                    )}
+                    {selectedSale.tax > 0 && (
+                      <div className="flex justify-between">
+                        <span>Tax:</span>
+                        <span>{formatCurrency(selectedSale.tax)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold border-t pt-2 mt-2">
+                      <span>Total:</span>
+                      <span>{formatCurrency(selectedSale.total)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span>Payment Method:</span>
+                      <span className="flex items-center font-medium">
+                        {getPaymentMethodIcon(selectedSale.payment_method)}
+                        {selectedSale.payment_method}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Notes Section */}
+            {selectedSale.notes && (
+              <div className="mt-4">
+                <h3 className="font-medium mb-2 flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-blue-500" />
+                  Additional Notes
+                </h3>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{selectedSale.notes}</p>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       )}

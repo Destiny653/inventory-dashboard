@@ -390,7 +390,7 @@ const formatCurrency = (amount: number): string => {
                             <p className="text-xs text-muted-foreground mt-1">
                               By {note.author} on {formatDate(note.created_at)}
                             </p>
-                          </div>
+                          </div> 
                         </div>
                       </div>
                     </div>
