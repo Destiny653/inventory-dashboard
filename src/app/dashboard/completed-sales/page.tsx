@@ -19,9 +19,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, ChevronLeft, ChevronRight, FileText, User, CreditCard, Store, Mail, Phone, ShoppingBag } from 'lucide-react'
+import { 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  FileText, 
+  User, 
+  CreditCard, 
+  Store, 
+  Mail, 
+  Phone, 
+  ShoppingBag,
+  FileSpreadsheet,
+  Loader2
+} from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Image from 'next/image'
+import * as XLSX from 'xlsx'
+import { saveAs } from 'file-saver'
+import { format } from 'date-fns'
+import { toast } from 'sonner'
 
 interface CompletedSale {
   id: string;
@@ -57,6 +74,7 @@ interface CompletedSale {
 export default function CompletedSalesPage() {
   const [sales, setSales] = useState<CompletedSale[]>([])
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -68,53 +86,150 @@ export default function CompletedSalesPage() {
   }, [currentPage])
 
   async function fetchSales() {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // 1. Get paginated completed_sales
-    const { data: salesData, error: salesError, count } = await supabase
-      .from('completed_sales')
-      .select('*', { count: 'exact' })
-      .order('transaction_date', { ascending: false })
-      .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+      // 1. Get paginated completed_sales
+      const { data: salesData, error: salesError, count } = await supabase
+        .from('completed_sales')
+        .select('*', { count: 'exact' })
+        .order('transaction_date', { ascending: false })
+        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
 
-    if (salesError) throw salesError;
-    setTotalCount(count || 0);
+      if (salesError) throw salesError;
+      setTotalCount(count || 0);
 
-    // 2. Get unique staff_ids
-    const uniqueStaffIds = [...new Set((salesData || []).map(sale => sale.staff_id).filter(Boolean))];
+      // 2. Get unique staff_ids
+      const uniqueStaffIds = [...new Set((salesData || []).map(sale => sale.staff_id).filter(Boolean))];
 
-    // 3. Fetch user profiles manually
-    let staffProfilesMap: Record<string, any> = {};
-    if (uniqueStaffIds.length > 0) {
-      const { data: staffProfiles, error: profilesError } = await supabase
-        .from('user_profiles') // <-- this is your view
-        .select('id, full_name, email, phone')
-        .in('id', uniqueStaffIds);
+      // 3. Fetch user profiles manually
+      let staffProfilesMap: Record<string, any> = {};
+      if (uniqueStaffIds.length > 0) {
+        const { data: staffProfiles, error: profilesError } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, email, phone')
+          .in('id', uniqueStaffIds);
 
-      if (profilesError) throw profilesError;
+        if (profilesError) throw profilesError;
 
-      // 4. Map profiles by ID for quick lookup
-      staffProfilesMap = (staffProfiles || []).reduce((acc, profile) => {
-        acc[profile.id] = profile;
-        return acc;
-      }, {} as Record<string, any>);
+        // 4. Map profiles by ID for quick lookup
+        staffProfilesMap = (staffProfiles || []).reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {} as Record<string, any>);
+      }
+
+      // 5. Attach staff info manually to each sale
+      const formattedSales = (salesData || []).map((sale) => ({
+        ...sale,
+        staff_info: sale.staff_id ? staffProfilesMap[sale.staff_id] : undefined
+      }));
+
+      setSales(formattedSales);
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+      toast.error('Failed to load sales data');
+    } finally {
+      setLoading(false);
     }
-
-    // 5. Attach staff info manually to each sale
-    const formattedSales = (salesData || []).map((sale) => ({
-      ...sale,
-      staff_info: sale.staff_id ? staffProfilesMap[sale.staff_id] : undefined
-    }));
-
-    setSales(formattedSales);
-  } catch (error) {
-    console.error('Error fetching sales:', error);
-  } finally {
-    setLoading(false);
   }
-}
 
+  async function exportToExcel() {
+    try {
+      setExporting(true)
+      
+      // Transform data for export
+      const exportData = sales.map(sale => ({
+        'Sale ID': sale.id,
+        'Order ID': sale.order_id || 'N/A',
+        'Transaction Date': format(new Date(sale.transaction_date), 'yyyy-MM-dd HH:mm:ss'),
+        'Customer Name': sale.customer_name || 'Anonymous',
+        'Customer Email': sale.customer_email || 'N/A',
+        'Customer Phone': sale.customer_phone || 'N/A',
+        'Items Count': sale.items.length,
+        'Subtotal': sale.subtotal,
+        'Tax': sale.tax,
+        'Discount': sale.discount,
+        'Total': sale.total,
+        'Payment Method': sale.payment_method,
+        'Processed By': sale.staff_info?.full_name || 'System',
+        'Staff Email': sale.staff_info?.email || 'N/A',
+        'Staff Phone': sale.staff_info?.phone || 'N/A',
+        'Sale Type': sale.is_in_person ? 'In-Person' : 'Online',
+        'Notes': sale.notes || 'N/A'
+      }))
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Completed Sales')
+      
+      // Generate Excel file
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+      const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      
+      // Save file
+      saveAs(data, `completed_sales_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`)
+      
+      toast.success('Excel export completed successfully')
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Failed to export sales data')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function exportToCSV() {
+    try {
+      setExporting(true)
+      
+      // CSV headers
+      const headers = [
+        'Sale ID', 'Order ID', 'Transaction Date', 'Customer Name', 'Customer Email',
+        'Customer Phone', 'Items Count', 'Subtotal', 'Tax', 'Discount', 'Total',
+        'Payment Method', 'Processed By', 'Staff Email', 'Staff Phone', 'Sale Type', 'Notes'
+      ]
+      
+      // CSV rows
+      const rows = sales.map(sale => [
+        sale.id,
+        sale.order_id || 'N/A',
+        format(new Date(sale.transaction_date), 'yyyy-MM-dd HH:mm:ss'),
+        sale.customer_name || 'Anonymous',
+        sale.customer_email || 'N/A',
+        sale.customer_phone || 'N/A',
+        sale.items.length,
+        sale.subtotal,
+        sale.tax,
+        sale.discount,
+        sale.total,
+        sale.payment_method,
+        sale.staff_info?.full_name || 'System',
+        sale.staff_info?.email || 'N/A',
+        sale.staff_info?.phone || 'N/A',
+        sale.is_in_person ? 'In-Person' : 'Online',
+        sale.notes || 'N/A'
+      ])
+      
+      // Create CSV content
+      let csvContent = headers.join(',') + '\n'
+      rows.forEach(row => {
+        csvContent += row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',') + '\n'
+      })
+      
+      // Save file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      saveAs(blob, `completed_sales_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`)
+      
+      toast.success('CSV export completed successfully')
+    } catch (error) {
+      console.error('CSV export failed:', error)
+      toast.error('Failed to export CSV')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const filteredSales = sales.filter(sale => 
     sale.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,6 +268,35 @@ export default function CompletedSalesPage() {
             className="pl-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        </div>
+        
+        <div className="flex gap-2">
+          <Button 
+            onClick={exportToExcel} 
+            disabled={exporting || sales.length === 0}
+            variant="outline"
+            className="border-gray-300 hover:bg-gray-50"
+          >
+            {exporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+            )}
+            Excel
+          </Button>
+          <Button 
+            onClick={exportToCSV} 
+            disabled={exporting || sales.length === 0}
+            variant="outline"
+            className="border-gray-300 hover:bg-gray-50"
+          >
+            {exporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="mr-2 h-4 w-4" />
+            )}
+            CSV
+          </Button>
         </div>
       </div>
 
