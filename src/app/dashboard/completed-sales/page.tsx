@@ -1,6 +1,6 @@
  'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,7 +31,9 @@ import {
   Phone, 
   ShoppingBag,
   FileSpreadsheet,
-  Loader2
+  Loader2,
+  Printer,
+  Receipt as ReceiptIcon
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Image from 'next/image'
@@ -71,6 +73,238 @@ interface CompletedSale {
   notes?: string;
 }
 
+// Receipt Component
+const Receipt = ({ sale, onClose }: { sale: CompletedSale; onClose: () => void }) => {
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt - ${sale.order_id || sale.id.slice(0, 8)}</title>
+        <style>
+          @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            .receipt { width: 80mm; font-family: 'Courier New', monospace; }
+          }
+          body { margin: 0; padding: 20px; background: #f5f5f5; }
+          .receipt {
+            width: 80mm;
+            max-width: 300px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          }
+          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+          .store-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+          .store-info { font-size: 10px; margin-bottom: 2px; }
+          .divider { border-top: 1px dashed #000; margin: 10px 0; }
+          .double-divider { border-top: 2px solid #000; margin: 10px 0; }
+          .item-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+          .item-details { font-size: 11px; margin-bottom: 5px; }
+          .total-section { margin-top: 10px; }
+          .total-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+          .grand-total { font-weight: bold; font-size: 14px; }
+          .footer { text-align: center; margin-top: 15px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
+          .thank-you { font-weight: bold; margin-bottom: 5px; }
+        </style>
+      </head>
+      <body>
+        ${printContent.innerHTML}
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Wait for content to load before printing
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[400px] bg-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ReceiptIcon className="h-5 w-5 text-green-500" />
+            Receipt Preview
+          </DialogTitle>
+          <DialogDescription>
+            Preview and print receipt for this transaction
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Receipt Preview */}
+          <div className="max-h-[500px] overflow-y-auto border rounded-lg bg-gray-50 p-4">
+            <div ref={printRef} className="receipt bg-white p-4 mx-auto" style={{ width: '80mm', maxWidth: '300px', fontFamily: 'Courier New, monospace', fontSize: '12px', lineHeight: '1.4' }}>
+              {/* Header */}
+              <div className="header text-center" style={{ borderBottom: '2px solid #000', paddingBottom: '10px', marginBottom: '15px' }}>
+                <div className="store-name" style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
+                  MARKETPLACE
+                </div>
+                <div className="store-info" style={{ fontSize: '10px', marginBottom: '2px' }}>
+                  123 Main St, Suite 100
+                </div>
+                <div className="store-info" style={{ fontSize: '10px', marginBottom: '2px' }}>
+                  Bamenda, North West Region, 00237
+                </div>
+                <div className="store-info" style={{ fontSize: '10px', marginBottom: '2px' }}>
+                  Tel: (555) 123-4567
+                </div>
+                <div className="store-info" style={{ fontSize: '10px' }}>
+                  marketplace-five-gold.vercel.app
+                </div>
+              </div>
+
+              {/* Transaction Info */}
+              <div style={{ marginBottom: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Receipt #:</span>
+                  <span>{sale.order_id || sale.id.slice(0, 8).toUpperCase()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Date:</span>
+                  <span>{format(new Date(sale.transaction_date), 'MM/dd/yyyy')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Time:</span>
+                  <span>{format(new Date(sale.transaction_date), 'HH:mm:ss')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Cashier:</span>
+                  <span>{sale.staff_info?.full_name || 'System'}</span>
+                </div>
+                {sale.customer_name && sale.customer_name !== 'Anonymous' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span>Customer:</span>
+                    <span>{sale.customer_name}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="divider" style={{ borderTop: '1px dashed #000', margin: '10px 0' }}></div>
+
+              {/* Items */}
+              <div style={{ marginBottom: '15px' }}>
+                {sale.items.map((item, index) => (
+                  <div key={index} style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                      <span style={{ maxWidth: '60%', wordWrap: 'break-word' }}>{item.name}</span>
+                      <span>{formatCurrency(item.price * item.quantity)}</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#666', marginLeft: '2px' }}>
+                      {item.quantity} x {formatCurrency(item.price)} each
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="divider" style={{ borderTop: '1px dashed #000', margin: '10px 0' }}></div>
+
+              {/* Totals */}
+              <div className="total-section" style={{ marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(sale.subtotal)}</span>
+                </div>
+                
+                {sale.discount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', color: '#008000' }}>
+                    <span>Discount:</span>
+                    <span>-{formatCurrency(sale.discount)}</span>
+                  </div>
+                )}
+                
+                {sale.tax > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span>Tax:</span>
+                    <span>{formatCurrency(sale.tax)}</span>
+                  </div>
+                )}
+
+                <div className="double-divider" style={{ borderTop: '2px solid #000', margin: '10px 0' }}></div>
+                
+                <div className="grand-total" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                  <span>TOTAL:</span>
+                  <span>{formatCurrency(sale.total)}</span>
+                </div>
+
+                <div className="divider" style={{ borderTop: '1px dashed #000', margin: '10px 0' }}></div>
+
+                {/* Payment Method */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Payment:</span>
+                  <span>{sale.payment_method}</span>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Amount Paid:</span>
+                  <span>{formatCurrency(sale.total)}</span>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Change:</span>
+                  <span>{formatCurrency(0)}</span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="footer text-center" style={{ textAlign: 'center', marginTop: '15px', fontSize: '10px', borderTop: '1px dashed #000', paddingTop: '10px' }}>
+                <div className="thank-you" style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                  THANK YOU FOR YOUR BUSINESS!
+                </div>
+                <div style={{ marginBottom: '3px' }}>
+                  Items sold are not returnable
+                </div>
+                <div style={{ marginBottom: '3px' }}>
+                  Keep this receipt for your records
+                </div>
+                <div style={{ marginBottom: '8px' }}>
+                  Visit us again soon!
+                </div>
+                <div style={{ fontSize: '8px', marginTop: '10px' }}>
+                  Transaction ID: {sale.id}
+                </div>
+                <div style={{ fontSize: '8px' }}>
+                  {sale.is_in_person ? 'In-Store Purchase' : 'Online Order'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
+            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700">
+              <Printer className="mr-2 h-4 w-4" />
+              Print Receipt
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export default function CompletedSalesPage() {
   const [sales, setSales] = useState<CompletedSale[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,6 +313,7 @@ export default function CompletedSalesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [selectedSale, setSelectedSale] = useState<CompletedSale | null>(null)
+  const [showReceipt, setShowReceipt] = useState<CompletedSale | null>(null)
   const itemsPerPage = 10
 
   useEffect(() => {
@@ -357,15 +592,26 @@ export default function CompletedSalesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedSale(sale)}
-                        className="border-gray-300 hover:bg-gray-50"
-                      >
-                        <FileText className="h-4 w-4 mr-1" />
-                        Details
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedSale(sale)}
+                          className="border-gray-300 hover:bg-gray-50"
+                        >
+                          <FileText className="h-4 w-4 mr-1" />
+                          Details
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowReceipt(sale)}
+                          className="border-green-300 hover:bg-green-50 text-green-600"
+                        >
+                          <ReceiptIcon className="h-4 w-4 mr-1" />
+                          Receipt
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -432,6 +678,14 @@ export default function CompletedSalesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceipt && (
+        <Receipt 
+          sale={showReceipt} 
+          onClose={() => setShowReceipt(null)} 
+        />
       )}
 
       {/* Enhanced Sale Details Dialog */}
@@ -612,6 +866,21 @@ export default function CompletedSalesPage() {
                 </div>
               </div>
             )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-between mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowReceipt(selectedSale)}
+                className="border-green-300 hover:bg-green-50 text-green-600"
+              >
+                <ReceiptIcon className="mr-2 h-4 w-4" />
+                Print Receipt
+              </Button>
+              <Button variant="outline" onClick={() => setSelectedSale(null)}>
+                Close
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}

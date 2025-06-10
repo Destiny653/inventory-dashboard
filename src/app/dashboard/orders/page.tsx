@@ -39,6 +39,7 @@ interface Order {
   status: string
   total_amount: number
   created_at: string
+  updated_at?: string
   user_id: string
   payment_method?: string
   shipping_method?: string
@@ -46,8 +47,12 @@ interface Order {
     fullName: string
     city: string
     country: string
+    address?: string
+    postalCode?: string
+    phone?: string
   }
   user?: {
+    id: string
     email: string
     full_name?: string
     avatar_url?: string
@@ -67,9 +72,23 @@ export default function OrdersPage() {
   const [isBulkUpdating, setIsBulkUpdating] = useState(false)
   const [bulkStatus, setBulkStatus] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
+    let isMounted = true
+    async function fetchUser() {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error('Error fetching user:', error)
+        return
+      }
+      setUser(user)
+    }
+    fetchUser()
     fetchOrdersWithUsers()
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   async function fetchOrdersWithUsers() {
@@ -100,10 +119,11 @@ export default function OrdersPage() {
       const combinedData = ordersData.map(order => ({
         ...order,
         user: userProfiles?.find(user => user.id === order.user_id) || {
+          id: order.user_id,
           email: 'Unknown',
           full_name: order.shipping_address?.fullName || 'Customer',
           avatar_url: null,
-          phone: null
+          phone: order.shipping_address?.phone || null
         }
       }))
 
@@ -115,6 +135,73 @@ export default function OrdersPage() {
       setLoading(false)
     }
   }
+
+  // Function to move order to completed_orders table
+  async function moveToCompletedOrders(order: Order) {
+    try {
+      const { data: existing, error: checkError } = await supabase
+        .from('completed_orders')
+        .select('original_order_id')
+        .eq('original_order_id', order.id)
+        .single()
+
+      if (existing) {
+        console.log('Order already exists in completed_orders');
+        return;
+      }
+      // Prepare the data for completed_orders table
+      const completedOrderData = {
+        original_order_id: order.id,
+        order_data: {
+          id: order.id,
+          status: order.status,
+          total_amount: order.total_amount,
+          created_at: order.created_at,
+          updated_at: order.updated_at || new Date().toISOString(),
+          payment_method: order.payment_method,
+          shipping_method: order.shipping_method,
+          shipping_address: order.shipping_address
+        },
+        customer_data: {
+          id: order.user?.id || order.user_id,
+          email: order.user?.email || 'Unknown',
+          full_name: order.user?.full_name || order.shipping_address?.fullName || 'Customer',
+          phone: order.user?.phone || order.shipping_address?.phone
+        },
+        completed_at: new Date().toISOString()
+      }
+
+      // Insert into completed_orders table
+      const { error: insertError } = await supabase
+        .from('completed_orders')
+        .insert(completedOrderData)
+
+      if (insertError) {
+        console.error('Error moving to completed orders:', insertError)
+        throw insertError
+      }
+
+      console.log('Order successfully moved to completed_orders table')
+      toast.success('Order moved to completed orders')
+    } catch (error) {
+      console.error('Failed to move order to completed orders:', error)
+      toast.error('Failed to move order to completed orders')
+      throw error // Re-throw to handle in calling function
+    }
+  }
+  // make a loop for all orders to check if the status is delivered, if so, move to completed_orders
+  // useEffect(() => {
+  //   if (orders.length > 0) {
+  //     orders.forEach(order => {
+  //       if (order.status === 'delivered') {
+  //         moveToCompletedOrders(order).catch(error => {
+  //           console.error(`Failed to move order ${order.id} to completed orders:`, error)
+  //         })
+  //       }
+  //     })
+  //   }
+  // }, [orders])
+
 
 
   // Filter orders based on search term and status filter
@@ -146,18 +233,39 @@ export default function OrdersPage() {
 
   async function updateOrderStatus(orderId: string, newStatus: string) {
     try {
+      const currentOrder = orders.find(order => order.id === orderId)
+      if (!currentOrder) {
+        toast.error('Order not found')
+        return
+      }
+
+      // Update the order status in the database
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+          last_updated_by: user?.id || null
+        })
         .eq('id', orderId)
 
-      if (error) throw error
+      if (error) {
+        console.error('Database update error:', error)
+        throw error
+      }
+
+      // If status is delivered, move to completed_orders
+      if (newStatus === 'delivered') {
+        const updatedOrder = { ...currentOrder, status: newStatus }
+        await moveToCompletedOrders(updatedOrder)
+      }
 
       // Update local state
       setOrders(orders.map(order =>
-        order.id === orderId ? { ...order, status: newStatus } : order
+        order.id === orderId ? { ...order, status: newStatus, updated_at: new Date().toISOString() } : order
       ))
-      toast.success('Order status updated')
+
+      toast.success('Order status updated successfully')
     } catch (error) {
       console.error('Error updating order status:', error)
       toast.error('Failed to update order status')
@@ -169,22 +277,41 @@ export default function OrdersPage() {
 
     try {
       setIsBulkUpdating(true)
+
+      // Update orders in database
       const { error } = await supabase
         .from('orders')
         .update({
           status: bulkStatus,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          last_updated_by: user?.id || null
         })
         .in('id', selectedOrders)
 
       if (error) throw error
 
+      // If bulk status is delivered, move all selected orders to completed_orders
+      if (bulkStatus === 'delivered') {
+        const ordersToComplete = orders.filter(order => selectedOrders.includes(order.id))
+
+        for (const order of ordersToComplete) {
+          try {
+            const updatedOrder = { ...order, status: bulkStatus }
+            await moveToCompletedOrders(updatedOrder)
+          } catch (error) {
+            console.error(`Failed to move order ${order.id} to completed orders:`, error)
+            // Continue with other orders even if one fails
+          }
+        }
+      }
+
       // Update local state
       setOrders(orders.map(order =>
         selectedOrders.includes(order.id)
-          ? { ...order, status: bulkStatus }
+          ? { ...order, status: bulkStatus, updated_at: new Date().toISOString() }
           : order
       ))
+
       setSelectedOrders([])
       setBulkStatus('')
       toast.success(`Updated ${selectedOrders.length} order(s)`)
@@ -235,7 +362,6 @@ export default function OrdersPage() {
       setSelectedOrders(filteredOrders.map(order => order.id))
     }
   }
-
 
   function formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -296,9 +422,14 @@ export default function OrdersPage() {
     <div className="container mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Order Management</h1>
-        <Button asChild>
-          <Link href="/orders/create">Create Order</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link href="/dashboard/sales/completed">View Completed Orders</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/orders/create">Create Order</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between my-6">
@@ -517,7 +648,10 @@ export default function OrdersPage() {
                         <div className="flex gap-2">
                           <Select
                             value={order.status}
-                            onValueChange={(value) => updateOrderStatus(order.id, value)}
+                            onValueChange={(value) => {
+                              console.log('Status change triggered for order:', order.id);
+                              updateOrderStatus(order.id, value);
+                            }}
                           >
                             <SelectTrigger className="w-[130px] bg-white">
                               <SelectValue />

@@ -41,6 +41,7 @@ interface Category {
 export default function DirectSalesPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
+  const [paginatedProducts, setPaginatedProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [cart, setCart] = useState<Array<{
@@ -68,10 +69,22 @@ export default function DirectSalesPage() {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalProducts, setTotalProducts] = useState(0)
   const itemsPerPage = 12
-  success && setTimeout(() => setSuccess(false), 2000)
-  error && setTimeout(() => setError(false), 2000)
+
+  // Auto-hide success/error messages
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(false), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [success])
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(false), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -84,28 +97,25 @@ export default function DirectSalesPage() {
   }, [])
 
   useEffect(() => {
-    // Reset to page 1 when filters change
+    // Reset to page 1 when filters change and apply filters
     setCurrentPage(1)
     filterProducts()
   }, [searchTerm, selectedCategory, products])
+
+  useEffect(() => {
+    // Update paginated products when filtered products or current page changes
+    paginateProducts()
+  }, [filteredProducts, currentPage])
 
   async function fetchProducts() {
     try {
       setLoadingProducts(true)
       
-      // First get the total count
-      const { count } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
-      
-      setTotalProducts(count || 0)
-      
-      // Then fetch the first page
+      // Fetch all products at once for client-side filtering and pagination
       const { data, error } = await supabase
         .from('products')
         .select('id, name, price, stock_quantity, image_url, category_id')
         .order('name')
-        .range(0, itemsPerPage - 1)
 
       if (error) throw error
       setProducts(data || [])
@@ -130,24 +140,6 @@ export default function DirectSalesPage() {
     }
   }
 
-  async function loadMoreProducts() {
-    try {
-      setLoadingProducts(true)
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, price, stock_quantity, image_url, category_id')
-        .order('name')
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1)
-
-      if (error) throw error
-      setProducts(prev => [...prev, ...(data || [])])
-    } catch (error) {
-      console.error('Error loading more products:', error)
-    } finally {
-      setLoadingProducts(false)
-    }
-  }
-
   const filterProducts = () => {
     let result = products
     
@@ -166,17 +158,23 @@ export default function DirectSalesPage() {
     setFilteredProducts(result)
   }
 
-  const handlePageChange = async (newPage: number) => {
+  const paginateProducts = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const paginated = filteredProducts.slice(startIndex, endIndex)
+    setPaginatedProducts(paginated)
+  }
+
+  const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
-    
-    // Check if we need to load more products
-    const hasEnoughProducts = products.length >= newPage * itemsPerPage
-    if (!hasEnoughProducts) {
-      await loadMoreProducts()
-    }
   }
 
   const addToCart = (product: Product) => {
+    if (product.stock_quantity < 1) {
+      setError(true)
+      return
+    }
+
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === product.id)
       if (existingItem) {
@@ -196,83 +194,95 @@ export default function DirectSalesPage() {
       }
     })
   }
-    const removeFromCart = (productId: number) => {
-        setCart(prevCart => prevCart.filter(item => item.id !== productId))
+
+  const removeFromCart = (productId: number) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId))
+  }
+
+  const updateQuantity = (productId: number, newQuantity: number) => {
+    if (newQuantity < 1) {
+      removeFromCart(productId)
+      return
     }
 
-    const updateQuantity = (productId: number, newQuantity: number) => {
-        if (newQuantity < 1) {
-            removeFromCart(productId)
-            return
-        }
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === productId
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    )
+  }
 
-        setCart(prevCart =>
-            prevCart.map(item =>
-                item.id === productId
-                    ? { ...item, quantity: newQuantity }
-                    : item
-            )
-        )
-    } 
-   const handleSubmit = async () => {
-        try {
-            setIsSubmitting(true)
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true)
 
-            const saleData = {
-                transaction_date: new Date().toISOString(),
-                customer_name: customerName || 'Anonymous',
-                customer_email: customerEmail || null,
-                customer_phone: customerPhone || null,
-                items: cart.map(item => ({
-                    id: item.id,
-                    name: item.name,
-                    price: item.price,
-                    quantity: item.quantity,
-                    image_url: item.image_url || null
-                })),
-                subtotal,
-                tax,
-                discount,
-                total,
-                payment_method: paymentMethod,
-                staff_id: user?.id,
-                is_in_person: true,
-                notes: notes || null
-            }
+      const saleData = {
+        transaction_date: new Date().toISOString(),
+        customer_name: customerName || 'Anonymous',
+        customer_email: customerEmail || null,
+        customer_phone: customerPhone || null,
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image_url: item.image_url || null
+        })),
+        subtotal,
+        tax,
+        discount,
+        total,
+        payment_method: paymentMethod,
+        staff_id: user?.id,
+        is_in_person: true,
+        notes: notes || null
+      }
 
-            const { error } = await supabase
-                .from('completed_sales')
-                .insert(saleData)
+      const { error } = await supabase
+        .from('completed_sales')
+        .insert(saleData)
 
-            if (error) throw error
+      if (error) throw error
 
-            // Update product stock quantities
-            for (const item of cart) {
-                const { error: updateError } = await supabase.rpc('decrement_product_stock', {
-                    product_id: item.id,
-                    amount: item.quantity
-                })
+      // Update product stock quantities
+      for (const item of cart) {
+        const { error: updateError } = await supabase.rpc('decrement_product_stock', {
+          product_id: item.id,
+          amount: item.quantity
+        })
 
-                if (updateError) throw updateError
-            }
+        if (updateError) throw updateError
+      }
 
-            setSuccess(true)
-            resetForm()
-
-            // Reset success message after 3 seconds
-            setTimeout(() => setSuccess(false), 3000)
-        } catch (error) {
-            console.error('Error processing sale:', error)
-        } finally {
-            setIsSubmitting(false)
-        }
+      setSuccess(true) 
+      setCart([]) // Clear cart after successful sale
+      setCustomerName('')
+      setCustomerEmail('')
+      setCustomerPhone('')
+      setPaymentMethod('cash')
+      setDiscount(0)
+      setNotes('')
+      setSearchTerm('')
+      setSelectedCategory('all')
+      setCurrentPage(1) // Reset to first page
+      
+      // Refresh products to get updated stock quantities
+      await fetchProducts()
+    } catch (error) {
+      console.error('Error processing sale:', error)
+      setError(true)
+    } finally {
+      setIsSubmitting(false)
     }
+  }
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   const tax = subtotal * taxRate
   const total = subtotal + tax - discount
 
-  const totalPages = Math.ceil(totalProducts / itemsPerPage)
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
 
   return (
     <div className="space-y-4 p-4 bg-white rounded-lg">
@@ -309,18 +319,29 @@ export default function DirectSalesPage() {
               </select>
             </div>
 
-            <h2 className="text-lg font-medium mb-4">Available Products</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Available Products</h2>
+              {filteredProducts.length > 0 && (
+                <span className="text-sm text-gray-500">
+                  {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
+                </span>
+              )}
+            </div>
 
-            {loadingProducts && currentPage === 1 ? (
+            {loadingProducts ? (
               <div className="text-center py-10 text-gray-500">Loading products...</div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                {searchTerm || selectedCategory !== 'all' ? 'No products match your search criteria' : 'No products available'}
+              </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {filteredProducts.map((product, i )=> (
+                  {paginatedProducts.map((product, i) => (
                     <div
-                      key={i}
+                      key={product.id}
                       className="border rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer flex flex-col"
-                      onClick={() => product.stock_quantity < 1 ? setError(true) :  addToCart(product)}
+                      onClick={() => addToCart(product)}
                     >
                       <div className="relative aspect-square mb-2 bg-gray-100 rounded-md overflow-hidden">
                         {product.image_url ? (
@@ -335,12 +356,17 @@ export default function DirectSalesPage() {
                             <ShoppingCart className="h-8 w-8" />
                           </div>
                         )}
+                        {product.stock_quantity < 1 && (
+                          <div className="absolute inset-0 bg-red-500 bg-opacity-20 flex items-center justify-center">
+                            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">Out of Stock</span>
+                          </div>
+                        )}
                       </div>
                       <h3 className="font-medium text-sm line-clamp-2">{product.name}</h3>
                       <p className="text-green-600 font-semibold text-sm mt-1">
                         {formatCurrency(product.price)}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className={`text-xs mt-1 ${product.stock_quantity < 1 ? 'text-red-500' : 'text-gray-500'}`}>
                         {product.stock_quantity} in stock
                       </p>
                     </div>
@@ -639,14 +665,14 @@ export default function DirectSalesPage() {
               </div>
             </div>
           )}
-          { error && (
+          {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg">
               <div className="flex items-center">
                 <Trash className="h-5 w-5 mr-2" />
-                <span>Product is below treshhold!</span>
+                <span>Product is out of stock or below threshold!</span>
               </div>
             </div>
-          ) }
+          )}
         </div>
       </div>
     </div>
@@ -655,8 +681,4 @@ export default function DirectSalesPage() {
  
 function Separator({ className }: { className?: string }) {
   return <div className={`border-t border-gray-200 ${className}`} />
-}
-
-function resetForm() {
-    throw new Error('Function not implemented.')
 }

@@ -176,7 +176,7 @@ export default function OrderDetailPage() {
       toast.success(`Order status updated to ${newStatus}`)
     } catch (error) {
       console.error('Error updating order status:', error)
-      toast.error('Failed to update order status')
+      toast.error('Failed to update order status: ' + (error instanceof Error ? error.message : 'Unknown error')) 
     } finally {
       setUpdating(false)
     }
