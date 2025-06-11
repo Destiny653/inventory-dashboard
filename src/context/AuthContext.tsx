@@ -8,6 +8,9 @@ import { supabase } from '@/lib/supabase'
 type AuthContextType = {
   user: any
   isAdmin: boolean
+  isVendor: boolean
+  isAuthorized: boolean // Helper for admin OR vendor
+  userRole: string | null
   isLoading: boolean
   signOut: () => Promise<void>
 }
@@ -18,17 +21,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isVendor, setIsVendor] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Helper function to determine user permissions
+  const setUserPermissions = (userData: any) => {
+    const role = userData?.user_metadata?.role
+    setUserRole(role || null)
+    setIsAdmin(role === 'admin')
+    setIsVendor(role === 'vendor')
+  }
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
           setUser(session.user)
-          setIsAdmin(session.user.user_metadata?.role === 'admin')
+          setUserPermissions(session.user)
         } else {
           setUser(null)
           setIsAdmin(false)
+          setIsVendor(false)
+          setUserRole(null)
         }
         setIsLoading(false)
       }
@@ -47,7 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUser(user)
-        setIsAdmin(user.user_metadata?.role === 'admin')
+        setUserPermissions(user)
+      } else {
+        setUser(null)
+        setIsAdmin(false)
+        setIsVendor(false)
+        setUserRole(null)
       }
     } catch (error) {
       console.error('Error checking user:', error)
@@ -61,8 +81,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login')
   }
 
+  // Computed value for components that need admin OR vendor access
+  const isAuthorized = isAdmin || isVendor
+
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isLoading, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAdmin, 
+      isVendor, 
+      isAuthorized, 
+      userRole, 
+      isLoading, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   )

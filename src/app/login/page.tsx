@@ -38,13 +38,31 @@ export default function LoginPage() {
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession()
             if (session) {
-                // User is already logged in, redirect to dashboard
-                router.push('/dashboard')
+                // User is already logged in, redirect based on role
+                const userRole = session.user.user_metadata?.role || 'customer'
+                redirectUserBasedOnRole(userRole)
             }
         }
         
         checkSession()
     }, [router])
+
+    const redirectUserBasedOnRole = (role: string) => {
+        switch (role.toLowerCase()) {
+            case 'admin':
+                router.push('/dashboard/admin')
+                break
+            case 'vendor':
+                router.push('/dashboard/vendor')
+                break
+            case 'customer':
+                router.push('/dashboard')
+                break
+            default:
+                router.push('/dashboard')
+                break
+        }
+    }
 
     async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault()
@@ -57,15 +75,7 @@ export default function LoginPage() {
             setLoading(true)
             setError('')
 
-            const isAdmin = ['sabrinaloden448@gmail.com', 'fokundem653@gmail.com'].includes(email.toLowerCase())
-
-            if (!isAdmin) { 
-                router.push('/unauthorized')
-                return
-            }
-
-
-            // Real Supabase auth call
+            // Supabase auth call
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
@@ -76,20 +86,19 @@ export default function LoginPage() {
             }
 
             if (data?.user) {
-                // Check user metadata or role to determine redirect path
-                // For now, we'll use email as a simple way to determine role
-                let redirectPath = '/dashboard'
+                // Get user role from metadata
+                const userRole = data.user.user_metadata?.role || 'customer'
                 
-                // You can store user roles in user metadata when they sign up
-                // and check that here instead of using email
-                if (email.includes('admin')) {
-                    redirectPath = '/dashboard/admin'
-                } else if (email.includes('vendor')) {
-                    redirectPath = '/dashboard/vendor'
+                // Check if user has admin or vendor role
+                if (['admin', 'vendor'].includes(userRole.toLowerCase())) {
+                    // Redirect based on role
+                    redirectUserBasedOnRole(userRole)
+                } else {
+                    // User doesn't have admin or vendor role
+                    await supabase.auth.signOut()
+                    router.push('/unauthorized')
+                    return
                 }
-
-                // Redirect to dashboard
-                router.push(redirectPath)
             }
         } catch (err: any) {
             console.error('Login error:', err)
@@ -113,6 +122,7 @@ export default function LoginPage() {
             if (error) throw error
             
             // The redirect happens automatically by Supabase
+            // Role checking will be handled in the callback page or after redirect
         } catch (err: any) {
             console.error('Google login error:', err)
             setError(err.message || 'Failed to sign in with Google. Please try again.')
@@ -284,11 +294,12 @@ export default function LoginPage() {
 
                 {/* Demo account information */}
                 <div className="mt-8 p-4 border border-blue-100 rounded-md bg-blue-50">
-                    <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Accounts</h3>
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">Access Levels</h3>
                     <div className="text-xs text-blue-700 space-y-1">
-                        <p>Customer: customer@example.com / password</p>
-                        <p>Vendor: vendor@example.com / password</p>
-                        <p>Admin: admin@example.com / password</p>
+                        <p>Admin: Full system access</p>
+                        <p>Vendor: Vendor dashboard access</p>
+                        <p>Customer: Basic dashboard access</p>
+                        <p className="text-red-600 font-medium">Note: Access is determined by your account role</p>
                     </div>
                 </div>
             </div>

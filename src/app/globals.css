@@ -127,6 +127,19 @@
     --theme-800: #1e293b;
     --theme-900: #0f172a;
     --theme-950: #020617;
+
+      --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  
+  /* Cell size for calendar */
+  --cell-size: var(--spacing-8);
     
     /* Primary brand color */
     --theme-primary: #2563eb;

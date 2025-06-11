@@ -1,4 +1,4 @@
-// app/dashboard/layout.tsx
+ // app/dashboard/layout.tsx
 'use client'
 
 import { useEffect } from 'react'
@@ -14,13 +14,13 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { user, isAdmin, isLoading } = useAuth()
+  const { user, isAuthorized, isLoading, userRole } = useAuth()
 
   useEffect(() => {
-    if (!isLoading && (!user || !isAdmin)) {
+    if (!isLoading && (!user || !isAuthorized)) {
       router.push('/unauthorized')
     }
-  }, [user, isAdmin, isLoading, router])
+  }, [user, isAuthorized, isLoading, router])
 
   if (isLoading) {
     return (
@@ -30,8 +30,8 @@ export default function DashboardLayout({
     )
   }
 
-  if (!user || !isAdmin) {
-    console.log("Please you must be admin to view this!")
+  if (!user || !isAuthorized) {
+    console.log(`Access denied. User role: ${userRole}. Must be admin or vendor to view this dashboard.`)
     return null // Will redirect in the useEffect
   }
 
@@ -41,7 +41,14 @@ export default function DashboardLayout({
         <Sidebar />
       </div>
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header user={{ id: user.id, name: user.user_metadata.full_name, email: user.email, avatar: user.user_metadata.avatar_url }} />
+        <Header 
+          user={{ 
+            id: user.id, 
+            name: user.user_metadata.full_name, 
+            email: user.email, 
+            avatar: user.user_metadata.avatar_url, 
+          }} 
+        />
         <main className="flex-1 overflow-y-auto p-4 bg-theme-50 dark:bg-theme-900 w-full">
           {children}
         </main>
@@ -49,5 +56,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-
-

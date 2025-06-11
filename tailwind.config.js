@@ -80,8 +80,9 @@ module.exports = {
                 700: 'var(--theme-purple-700)',
               }
             },
-          },
+          }, 
         },
+        
       },
     },
     plugins: [],

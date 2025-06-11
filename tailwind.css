@@ -1,0 +1,137 @@
+ @tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 91.4%;
+    /* other variables... */
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    @apply bg-background text-foreground; /* Ensure these classes are defined */
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer theme {
+  :root {
+    /* Font families */
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+    
+    /* Core colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    
+    /* Card colors */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    /* Primary colors */
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    
+    /* Secondary colors */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    
+    /* Muted colors */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    /* Accent colors */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    /* Destructive colors */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    /* Border/input colors */
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    
+    /* Radius */
+    --radius: 0.5rem;
+    
+    /* Theme colors */
+    --theme-50: 240 5% 96%;
+    --theme-100: 240 4% 92%;
+    --theme-200: 240 5% 84%;
+    --theme-300: 240 5% 65%;
+    --theme-400: 240 4% 46%;
+    --theme-500: 240 5% 34%;
+    --theme-600: 240 5% 26%;
+    --theme-700: 240 5% 20%;
+    --theme-800: 240 4% 16%;
+    --theme-900: 240 6% 10%;
+    
+    /* Spacing variables */
+    --spacing-1: 0.25rem;
+    --spacing-2: 0.5rem;
+    --spacing-3: 0.75rem;
+    --spacing-4: 1rem;
+    --spacing-5: 1.25rem;
+    --spacing-6: 1.5rem;
+    --spacing-8: 2rem;
+    --spacing-10: 2.5rem;
+    --spacing-12: 3rem;
+    
+    /* Cell size for calendar */
+    --cell-size: var(--spacing-8);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    /* Other dark theme variables... */
+  }
+}
+
+@layer components {
+  /* Ensure you define the bg-background class here */
+  .bg-background {
+    background-color: hsl(var(--background)); /* Adjust as necessary */
+  }
+
+  /* Theme variants */
+  .theme-blue {
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 221.2 83.2% 53.3%;
+    /* Other theme colors... */
+  }
+
+  /* Additional themes... */
+}
+
+/* Utility classes */
+@layer utilities {
+  /* For calendar component */
+  .calendar-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+  }
+  
+  /* Smooth transitions */
+  .transition-slow {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* For focus states */
+  .focus-ring {
+    @apply ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}

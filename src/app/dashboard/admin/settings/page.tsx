@@ -1,542 +1,674 @@
-'use client'
+ 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from '@/components/ui/card'
 import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Separator } from '@/components/ui/separator'
-import { AlertCircle, Save, Store, CreditCard, Bell, ShieldAlert } from 'lucide-react'
-import {ChangeEvent} from "react";
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
+import { Loader2, UserPlus, Edit, Trash2 } from 'lucide-react'
+
+interface User {
+  id: string
+  email: string
+  created_at: string
+  raw_user_meta_data: {
+    full_name?: string
+    role?: string
+    [key: string]: any
+  }
+  last_sign_in_at?: string
+}
 
 export default function AdminSettingsPage() {
-    const [loading, setLoading] = useState(true)
-    const [saving, setSaving] = useState(false)
+  const { isAdmin } = useAuth()
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedRole, setSelectedRole] = useState<string>('')
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false)
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false)
 
-    // General settings
-    const [general, setGeneral] = useState({
-        site_name: 'MultiVendor Market',
-        site_description: 'A marketplace for multiple vendors to sell their products.',
-        support_email: 'support@multivendor.com',
-        contact_phone: '(555) 123-4567',
-        address: '123 Market Street, San Francisco, CA 94103',
-    })
+  const [generalSettings, setGeneralSettings] = useState({
+    storeName: 'Marketplace',
+    storeEmail: 'admin@marketplace.com',
+    storeCurrency: 'USD',
+    storeTimezone: 'UTC',
+    maintenanceMode: false,
+  })
 
-    // Commission settings
-    const [commission, setCommission] = useState({
-        base_rate: '10',
-        featured_product_fee: '5',
-        minimum_payout: '50',
-        payout_schedule: 'monthly',
-    })
+  const [paymentSettings, setPaymentSettings] = useState({
+    stripeEnabled: true,
+    paypalEnabled: false,
+    stripePublicKey: '',
+    stripeSecretKey: '',
+    paypalClientId: '',
+  })
 
-    // Email settings
-    const [email, setEmail] = useState({
-        welcome_email_enabled: true,
-        order_confirmation_enabled: true,
-        shipping_updates_enabled: true,
-        review_request_enabled: true,
-        marketing_emails_enabled: false,
-    })
+  const [shippingSettings, setShippingSettings] = useState({
+    freeShippingThreshold: 50,
+    standardShippingRate: 5,
+    expressShippingRate: 10,
+  })
 
-    // Security settings
-    const [security, setSecurity] = useState({
-        vendor_approval_required: true,
-        product_approval_required: true,
-        two_factor_required_for_admin: true,
-        password_expiry_days: '90',
-        login_attempts_before_lockout: '5',
-    })
+  const [taxSettings, setTaxSettings] = useState({
+    taxEnabled: true,
+    taxRate: 7.5,
+    taxInclusive: false,
+  })
 
-    useEffect(() => {
-        async function loadSettings() {
-            try {
-                setLoading(true)
+  // Fetch users from Supabase
+  const fetchUsers = async () => {
+    setIsLoadingUsers(true)
+    try {
+      const { data, error } = await supabase
+        .from('auth.users')
+        .select('id, email, created_at, raw_user_meta_data, last_sign_in_at')
+        .order('created_at', { ascending: false })
 
-                // In a real app, these would be actual Supabase queries
-                // For demo, we're using the mock data initialized above
+      if (error) {
+        console.error('Error fetching users:', error)
+        toast.error('Failed to fetch users')
+        return
+      }
 
-                // Simulate API call delay
-                await new Promise(resolve => setTimeout(resolve, 500))
-
-            } catch (error) {
-                console.error('Error loading settings:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        loadSettings()
-    }, [])
-
-    const handleGeneralChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target
-        setGeneral(prev => ({ ...prev, [name]: value }))
+      setUsers(data || [])
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      toast.error('Failed to fetch users')
+    } finally {
+      setIsLoadingUsers(false)
     }
+  }
 
-    const handleCommissionChange = (key: string, value: string) => {
-        setCommission(prev => ({ ...prev, [key]: value }))
+  // Update user role
+  const updateUserRole = async (userId: string, email: string, role: string, fullName?: string) => {
+    setIsUpdatingRole(true)
+    try {
+      const { error } = await supabase.rpc('update_user_role', {
+        user_id: userId,
+        user_email: email,
+        new_role: role,
+        user_full_name: fullName || 'User'
+      })
+
+      if (error) {
+        console.error('Error updating user role:', error)
+        toast.error('Failed to update user role')
+        return
+      }
+
+      toast.success(`User role updated to ${role}`)
+      setIsRoleDialogOpen(false)
+      setSelectedUser(null)
+      setSelectedRole('')
+      fetchUsers() // Refresh users list
+    } catch (error) {
+      console.error('Error updating user role:', error)
+      toast.error('Failed to update user role')
+    } finally {
+      setIsUpdatingRole(false)
     }
+  }
 
-    const handleEmailChange = (key: string, value: boolean) => {
-        setEmail(prev => ({ ...prev, [key]: value }))
-    }
+  // Handle role assignment
+  const handleAssignRole = (user: User) => {
+    setSelectedUser(user)
+    setSelectedRole(user.raw_user_meta_data?.role || '')
+    setIsRoleDialogOpen(true)
+  }
 
-    const handleSecurityChange = (key: string, value: string | boolean) => {
-        setSecurity(prev => ({ ...prev, [key]: value }))
-    }
-
-    const saveSettings = async (section: string) => {
-        try {
-            setSaving(true)
-
-            // In a real app, this would save to Supabase
-            await new Promise(resolve => setTimeout(resolve, 800))
-
-            toast.success(`Your ${section} settings have been updated successfully.`, {
-                description: "Settings saved",
-            })
-        } catch (error) {
-            console.error(`Error saving ${section} settings:`, error)
-            toast.error("There was a problem saving your settings. Please try again.", {
-                description: "Error saving settings",
-            })
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    if (loading) {
-        return <div className="flex justify-center items-center h-64">Loading settings...</div>
-    }
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Admin Settings</h1>
-            </div>
-
-            <Tabs defaultValue="general" className="space-y-6">
-                <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                    <TabsTrigger value="general" className="flex items-center gap-2">
-                        <Store className="h-4 w-4" />
-                        <span className="hidden sm:inline">General</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="commission" className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        <span className="hidden sm:inline">Commission</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="email" className="flex items-center gap-2">
-                        <Bell className="h-4 w-4" />
-                        <span className="hidden sm:inline">Email</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="security" className="flex items-center gap-2">
-                        <ShieldAlert className="h-4 w-4" />
-                        <span className="hidden sm:inline">Security</span>
-                    </TabsTrigger>
-                </TabsList>
-
-                {/* General Settings */}
-                <TabsContent value="general" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>General Settings</CardTitle>
-                            <CardDescription>
-                                Configure basic information about your marketplace.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="site_name">Site Name</Label>
-                                        <Input
-                                            id="site_name"
-                                            name="site_name"
-                                            value={general.site_name}
-                                            onChange={handleGeneralChange}
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="support_email">Support Email</Label>
-                                        <Input
-                                            id="support_email"
-                                            name="support_email"
-                                            type="email"
-                                            value={general.support_email}
-                                            onChange={handleGeneralChange}
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="contact_phone">Contact Phone</Label>
-                                        <Input
-                                            id="contact_phone"
-                                            name="contact_phone"
-                                            value={general.contact_phone}
-                                            onChange={handleGeneralChange}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">Business Address</Label>
-                                    <Textarea
-                                        id="address"
-                                        name="address"
-                                        value={general.address}
-                                        onChange={handleGeneralChange}
-                                        rows={2}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="site_description">Site Description</Label>
-                                    <Textarea
-                                        id="site_description"
-                                        name="site_description"
-                                        value={general.site_description}
-                                        onChange={handleGeneralChange}
-                                        rows={3}
-                                    />
-                                    <p className="text-sm text-muted-foreground">
-                                        This description will be used for SEO and may appear in search results.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="flex justify-end">
-                            <Button
-                                onClick={() => saveSettings('general')}
-                                disabled={saving}
-                                className="flex items-center gap-2"
-                            >
-                                {saving ? 'Saving...' : (
-                                    <>
-                                        <Save className="h-4 w-4" />
-                                        Save Settings
-                                    </>
-                                )}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </TabsContent>
-
-                {/* Commission Settings */}
-                <TabsContent value="commission" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Commission Settings</CardTitle>
-                            <CardDescription>
-                                Configure how your marketplace charges vendors.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="base_rate">Base Commission Rate (%)</Label>
-                                        <Input
-                                            id="base_rate"
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={commission.base_rate}
-                                            onChange={(e) => handleCommissionChange('base_rate', e.target.value)}
-                                        />
-                                        <p className="text-sm text-muted-foreground">
-                                            Percentage of each sale that goes to the marketplace.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="featured_product_fee">Featured Product Fee ($)</Label>
-                                        <Input
-                                            id="featured_product_fee"
-                                            type="number"
-                                            min="0"
-                                            value={commission.featured_product_fee}
-                                            onChange={(e) => handleCommissionChange('featured_product_fee', e.target.value)}
-                                        />
-                                        <p className="text-sm text-muted-foreground">
-                                            Additional fee for featuring a product on the homepage.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="minimum_payout">Minimum Payout Amount ($)</Label>
-                                        <Input
-                                            id="minimum_payout"
-                                            type="number"
-                                            min="0"
-                                            value={commission.minimum_payout}
-                                            onChange={(e) => handleCommissionChange('minimum_payout', e.target.value)}
-                                        />
-                                        <p className="text-sm text-muted-foreground">
-                                            Minimum balance required before vendors can request a payout.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="payout_schedule">Payout Schedule</Label>
-                                        <Select
-                                            value={commission.payout_schedule}
-                                            onValueChange={(value) => handleCommissionChange('payout_schedule', value)}
-                                        >
-                                            <SelectTrigger id="payout_schedule">
-                                                <SelectValue placeholder="Select payout schedule" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="weekly">Weekly</SelectItem>
-                                                <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                                                <SelectItem value="monthly">Monthly</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-sm text-muted-foreground">
-                                            How often vendor payouts are processed.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
-                                    <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5" />
-                                    <p className="text-xs text-amber-800">
-                                        Changes to commission rates will only apply to new sales. Existing orders will use the rates that were in effect at the time of purchase.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="flex justify-end">
-                            <Button
-                                onClick={() => saveSettings('commission')}
-                                disabled={saving}
-                            >
-                                {saving ? 'Saving...' : 'Save Settings'}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </TabsContent>
-
-                {/* Email Settings */}
-                <TabsContent value="email" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Email Notification Settings</CardTitle>
-                            <CardDescription>
-                                Configure automated emails sent by the marketplace.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Welcome Email</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Send welcome email to new users when they sign up
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={email.welcome_email_enabled}
-                                        onCheckedChange={(checked) => handleEmailChange('welcome_email_enabled', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Order Confirmation</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Send email confirmation when an order is placed
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={email.order_confirmation_enabled}
-                                        onCheckedChange={(checked) => handleEmailChange('order_confirmation_enabled', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Shipping Updates</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Send email notifications for shipping status changes
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={email.shipping_updates_enabled}
-                                        onCheckedChange={(checked) => handleEmailChange('shipping_updates_enabled', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Review Requests</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Send email asking customers to review products after delivery
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={email.review_request_enabled}
-                                        onCheckedChange={(checked) => handleEmailChange('review_request_enabled', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Marketing Emails</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Send promotional emails about sales and new products
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={email.marketing_emails_enabled}
-                                        onCheckedChange={(checked) => handleEmailChange('marketing_emails_enabled', checked)}
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="flex justify-end">
-                            <Button
-                                onClick={() => saveSettings('email')}
-                                disabled={saving}
-                            >
-                                {saving ? 'Saving...' : 'Save Settings'}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </TabsContent>
-
-                {/* Security Settings */}
-                <TabsContent value="security" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Security Settings</CardTitle>
-                            <CardDescription>
-                                Configure security policies for your marketplace.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Vendor Approval Required</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            New vendor accounts require admin approval before they can sell
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={security.vendor_approval_required}
-                                        onCheckedChange={(checked) => handleSecurityChange('vendor_approval_required', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Product Approval Required</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            New products require admin approval before they appear in the marketplace
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={security.product_approval_required}
-                                        onCheckedChange={(checked) => handleSecurityChange('product_approval_required', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">Two-Factor Authentication for Admins</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Require two-factor authentication for all admin accounts
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={security.two_factor_required_for_admin}
-                                        onCheckedChange={(checked) => handleSecurityChange('two_factor_required_for_admin', checked)}
-                                    />
-                                </div>
-
-                                <Separator />
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="password_expiry_days">Password Expiry (days)</Label>
-                                        <Input
-                                            id="password_expiry_days"
-                                            type="number"
-                                            min="0"
-                                            value={security.password_expiry_days}
-                                            onChange={(e) => handleSecurityChange('password_expiry_days', e.target.value)}
-                                        />
-                                        <p className="text-sm text-muted-foreground">
-                                            Number of days before users are required to change their password (0 = never)
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="login_attempts_before_lockout">Failed Login Attempts Before Lockout</Label>
-                                        <Input
-                                            id="login_attempts_before_lockout"
-                                            type="number"
-                                            min="1"
-                                            max="10"
-                                            value={security.login_attempts_before_lockout}
-                                            onChange={(e) => handleSecurityChange('login_attempts_before_lockout', e.target.value)}
-                                        />
-                                        <p className="text-sm text-muted-foreground">
-                                            Number of failed login attempts before an account is temporarily locked
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="flex justify-end">
-                            <Button
-                                onClick={() => saveSettings('security')}
-                                disabled={saving}
-                            >
-                                {saving ? 'Saving...' : 'Save Settings'}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-        </div>
+  // Handle role update submission
+  const handleRoleUpdate = () => {
+    if (!selectedUser || !selectedRole) return
+    
+    updateUserRole(
+      selectedUser.id,
+      selectedUser.email,
+      selectedRole,
+      selectedUser.raw_user_meta_data?.full_name
     )
+  }
+
+  // Get role badge variant
+  const getRoleBadgeVariant = (role?: string) => {
+    switch (role) {
+      case 'admin':
+        return 'destructive'
+      case 'vendor':
+        return 'default'
+      default:
+        return 'secondary'
+    }
+  }
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers()
+    }
+  }, [isAdmin])
+
+  const handleGeneralSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setGeneralSettings(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handlePaymentSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target
+    setPaymentSettings(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  const handleShippingSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setShippingSettings(prev => ({
+      ...prev,
+      [name]: parseFloat(value) || 0
+    }))
+  }
+
+  const handleTaxSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target
+    setTaxSettings(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : parseFloat(value) || 0
+    }))
+  }
+
+  const handleSubmit = (section: string) => {
+    // In a real app, you would save these settings to your backend
+    toast.success(`${section} settings saved successfully`)
+  }
+
+  return (
+    <div className="space-y-4 p-4">
+      <h1 className="text-2xl font-bold">Admin Settings</h1>
+      
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="shipping">Shipping</TabsTrigger>
+          <TabsTrigger value="taxes">Taxes</TabsTrigger>
+        </TabsList>
+
+        {/* User Management */}
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                Manage user roles and permissions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">All Users</h3>
+                  <Button onClick={fetchUsers} disabled={isLoadingUsers}>
+                    {isLoadingUsers ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Refresh
+                  </Button>
+                </div>
+
+                {isLoadingUsers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Last Sign In</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>
+                              {user.raw_user_meta_data?.full_name || 'N/A'}
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={getRoleBadgeVariant(user.raw_user_meta_data?.role)}>
+                                {user.raw_user_meta_data?.role || 'user'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(user.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              {user.last_sign_in_at 
+                                ? new Date(user.last_sign_in_at).toLocaleDateString()
+                                : 'Never'
+                              }
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAssignRole(user)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit Role
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* General Settings */}
+        <TabsContent value="general">
+          <Card>
+            <CardHeader>
+              <CardTitle>General Settings</CardTitle>
+              <CardDescription>
+                Configure your store's basic information and preferences
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="storeName">Store Name</Label>
+                <Input
+                  id="storeName"
+                  name="storeName"
+                  value={generalSettings.storeName}
+                  onChange={handleGeneralSettingsChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="storeEmail">Store Email</Label>
+                <Input
+                  id="storeEmail"
+                  name="storeEmail"
+                  type="email"
+                  value={generalSettings.storeEmail}
+                  onChange={handleGeneralSettingsChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="storeCurrency">Store Currency</Label>
+                <Select
+                  value={generalSettings.storeCurrency}
+                  onValueChange={(value) => setGeneralSettings(prev => ({
+                    ...prev,
+                    storeCurrency: value
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                    <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                    <SelectItem value="GBP">British Pound (GBP)</SelectItem>
+                    <SelectItem value="JPY">Japanese Yen (JPY)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="storeTimezone">Store Timezone</Label>
+                <Select
+                  value={generalSettings.storeTimezone}
+                  onValueChange={(value) => setGeneralSettings(prev => ({
+                    ...prev,
+                    storeTimezone: value
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UTC">UTC</SelectItem>
+                    <SelectItem value="EST">Eastern Time (EST)</SelectItem>
+                    <SelectItem value="PST">Pacific Time (PST)</SelectItem>
+                    <SelectItem value="GMT">Greenwich Mean Time (GMT)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="maintenanceMode"
+                  checked={generalSettings.maintenanceMode}
+                  onCheckedChange={(checked) => setGeneralSettings(prev => ({
+                    ...prev,
+                    maintenanceMode: checked
+                  }))}
+                />
+                <Label htmlFor="maintenanceMode">Maintenance Mode</Label>
+              </div>
+              
+              <div className="flex justify-end">
+                <Button onClick={() => handleSubmit('General')}>
+                  Save General Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Payment Settings */}
+        <TabsContent value="payments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Settings</CardTitle>
+              <CardDescription>
+                Configure payment gateways and processing options
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="stripeEnabled"
+                  checked={paymentSettings.stripeEnabled}
+                  onCheckedChange={(checked) => setPaymentSettings(prev => ({
+                    ...prev,
+                    stripeEnabled: checked
+                  }))}
+                />
+                <Label htmlFor="stripeEnabled">Enable Stripe</Label>
+              </div>
+              
+              {paymentSettings.stripeEnabled && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="stripePublicKey">Stripe Publishable Key</Label>
+                    <Input
+                      id="stripePublicKey"
+                      name="stripePublicKey"
+                      value={paymentSettings.stripePublicKey}
+                      onChange={handlePaymentSettingsChange}
+                      placeholder="pk_test_..."
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="stripeSecretKey">Stripe Secret Key</Label>
+                    <Input
+                      id="stripeSecretKey"
+                      name="stripeSecretKey"
+                      value={paymentSettings.stripeSecretKey}
+                      onChange={handlePaymentSettingsChange}
+                      placeholder="sk_test_..."
+                      type="password"
+                    />
+                  </div>
+                </>
+              )}
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="paypalEnabled"
+                  checked={paymentSettings.paypalEnabled}
+                  onCheckedChange={(checked) => setPaymentSettings(prev => ({
+                    ...prev,
+                    paypalEnabled: checked
+                  }))}
+                />
+                <Label htmlFor="paypalEnabled">Enable PayPal</Label>
+              </div>
+              
+              {paymentSettings.paypalEnabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="paypalClientId">PayPal Client ID</Label>
+                  <Input
+                    id="paypalClientId"
+                    name="paypalClientId"
+                    value={paymentSettings.paypalClientId}
+                    onChange={handlePaymentSettingsChange}
+                    placeholder="AeA..."
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-end">
+                <Button onClick={() => handleSubmit('Payment')}>
+                  Save Payment Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Shipping Settings */}
+        <TabsContent value="shipping">
+          <Card>
+            <CardHeader>
+              <CardTitle>Shipping Settings</CardTitle>
+              <CardDescription>
+                Configure shipping rates and options
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="freeShippingThreshold">
+                  Free Shipping Threshold ({generalSettings.storeCurrency})
+                </Label>
+                <Input
+                  id="freeShippingThreshold"
+                  name="freeShippingThreshold"
+                  type="number"
+                  value={shippingSettings.freeShippingThreshold}
+                  onChange={handleShippingSettingsChange}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Customers get free shipping when order total exceeds this amount
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="standardShippingRate">
+                  Standard Shipping Rate ({generalSettings.storeCurrency})
+                </Label>
+                <Input
+                  id="standardShippingRate"
+                  name="standardShippingRate"
+                  type="number"
+                  value={shippingSettings.standardShippingRate}
+                  onChange={handleShippingSettingsChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="expressShippingRate">
+                  Express Shipping Rate ({generalSettings.storeCurrency})
+                </Label>
+                <Input
+                  id="expressShippingRate"
+                  name="expressShippingRate"
+                  type="number"
+                  value={shippingSettings.expressShippingRate}
+                  onChange={handleShippingSettingsChange}
+                />
+              </div>
+              
+              <div className="flex justify-end">
+                <Button onClick={() => handleSubmit('Shipping')}>
+                  Save Shipping Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Tax Settings */}
+        <TabsContent value="taxes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax Settings</CardTitle>
+              <CardDescription>
+                Configure tax calculation and display
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="taxEnabled"
+                  checked={taxSettings.taxEnabled}
+                  onCheckedChange={(checked) => setTaxSettings(prev => ({
+                    ...prev,
+                    taxEnabled: checked
+                  }))}
+                />
+                <Label htmlFor="taxEnabled">Enable Taxes</Label>
+              </div>
+              
+              {taxSettings.taxEnabled && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                    <Input
+                      id="taxRate"
+                      name="taxRate"
+                      type="number"
+                      value={taxSettings.taxRate}
+                      onChange={handleTaxSettingsChange}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="taxInclusive"
+                      checked={taxSettings.taxInclusive}
+                      onCheckedChange={(checked) => setTaxSettings(prev => ({
+                        ...prev,
+                        taxInclusive: checked
+                      }))}
+                    />
+                    <Label htmlFor="taxInclusive">Prices Include Tax</Label>
+                  </div>
+                </>
+              )}
+              
+              <div className="flex justify-end">
+                <Button onClick={() => handleSubmit('Tax')}>
+                  Save Tax Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Role Assignment Dialog */}
+      <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign User Role</DialogTitle>
+            <DialogDescription>
+              Select a role for {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Current Role</Label>
+              <Badge variant={getRoleBadgeVariant(selectedUser?.raw_user_meta_data?.role)}>
+                {selectedUser?.raw_user_meta_data?.role || 'user'}
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">New Role</Label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="vendor">Vendor</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsRoleDialogOpen(false)}
+              disabled={isUpdatingRole}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRoleUpdate}
+              disabled={!selectedRole || isUpdatingRole}
+            >
+              {isUpdatingRole ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Updating...
+                </>
+              ) : (
+                'Update Role'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
 }
