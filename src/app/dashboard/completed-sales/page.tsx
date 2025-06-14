@@ -73,64 +73,55 @@ interface CompletedSale {
   notes?: string;
 }
 
-// Receipt Component
+// Receipt Component 
+
 const Receipt = ({ sale, onClose }: { sale: CompletedSale; onClose: () => void }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
-
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    if (!printWindow || !printRef.current) return;
 
     printWindow.document.write(`
-      <!DOCTYPE html>
       <html>
-      <head>
-        <title>Receipt - ${sale.order_id || sale.id.slice(0, 8)}</title>
-        <style>
-          @media print {
-            body { margin: 0; padding: 0; }
-            .no-print { display: none !important; }
-            .receipt { width: 80mm; font-family: 'Courier New', monospace; }
-          }
-          body { margin: 0; padding: 20px; background: #f5f5f5; }
-          .receipt {
-            width: 80mm;
-            max-width: 300px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.4;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-          }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
-          .store-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-          .store-info { font-size: 10px; margin-bottom: 2px; }
-          .divider { border-top: 1px dashed #000; margin: 10px 0; }
-          .double-divider { border-top: 2px solid #000; margin: 10px 0; }
-          .item-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-          .item-details { font-size: 11px; margin-bottom: 5px; }
-          .total-section { margin-top: 10px; }
-          .total-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-          .grand-total { font-weight: bold; font-size: 14px; }
-          .footer { text-align: center; margin-top: 15px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
-          .thank-you { font-weight: bold; margin-bottom: 5px; }
-        </style>
-      </head>
-      <body>
-        ${printContent.innerHTML}
-      </body>
+        <head>
+          <title>Receipt</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; }
+              .receipt { width: 80mm; font-family: 'Courier New', monospace; font-size: 12px; }
+            }
+            body { background: white; padding: 20px; }
+            .receipt {
+              width: 80mm;
+              margin: auto;
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              line-height: 1.5;
+              color: #000;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .section { margin-top: 10px; }
+            .line { border-top: 1px dashed #000; margin: 8px 0; }
+            .double-line { border-top: 2px solid #000; margin: 10px 0; }
+            .items-header, .item-row {
+              display: flex;
+              justify-content: space-between;
+            }
+            .item-row span {
+              word-break: break-word;
+            }
+          </style>
+        </head>
+        <body>
+          ${printRef.current.innerHTML}
+        </body>
       </html>
     `);
 
     printWindow.document.close();
     printWindow.focus();
-    
-    // Wait for content to load before printing
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
@@ -151,152 +142,110 @@ const Receipt = ({ sale, onClose }: { sale: CompletedSale; onClose: () => void }
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Receipt Preview */}
-          <div className="max-h-[500px] overflow-y-auto border rounded-lg bg-gray-50 p-4">
-            <div ref={printRef} className="receipt bg-white p-4 mx-auto" style={{ width: '80mm', maxWidth: '300px', fontFamily: 'Courier New, monospace', fontSize: '12px', lineHeight: '1.4' }}>
-              {/* Header */}
-              <div className="header text-center" style={{ borderBottom: '2px solid #000', paddingBottom: '10px', marginBottom: '15px' }}>
-                <div className="store-name" style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
-                  MARKETPLACE
-                </div>
-                <div className="store-info" style={{ fontSize: '10px', marginBottom: '2px' }}>
-                  123 Main St, Suite 100
-                </div>
-                <div className="store-info" style={{ fontSize: '10px', marginBottom: '2px' }}>
-                  Bamenda, North West Region, 00237
-                </div>
-                <div className="store-info" style={{ fontSize: '10px', marginBottom: '2px' }}>
-                  Tel: (555) 123-4567
-                </div>
-                <div className="store-info" style={{ fontSize: '10px' }}>
-                  marketplace-five-gold.vercel.app
-                </div>
-              </div>
+          <div className="max-h-[500px] overflow-y-auto border rounded-lg bg-white p-4" ref={printRef}>
+            <div className="receipt">
+              <div className="center bold text-lg">MARKETPLACE</div>
+              <div className="center text-sm">123 Main St, Bamenda</div>
+              <div className="center text-sm">Tel: (555) 123-4567</div>
+              <div className="center text-sm">marketplace-five-gold.vercel.app</div>
+              <div className="line"></div>
 
-              {/* Transaction Info */}
-              <div style={{ marginBottom: '15px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <div className="section">
+                <div className="flex justify-between text-sm">
                   <span>Receipt #:</span>
                   <span>{sale.order_id || sale.id.slice(0, 8).toUpperCase()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <div className="flex justify-between text-sm">
                   <span>Date:</span>
                   <span>{format(new Date(sale.transaction_date), 'MM/dd/yyyy')}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <div className="flex justify-between text-sm">
                   <span>Time:</span>
                   <span>{format(new Date(sale.transaction_date), 'HH:mm:ss')}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <div className="flex justify-between text-sm">
                   <span>Cashier:</span>
                   <span>{sale.staff_info?.full_name || 'System'}</span>
                 </div>
                 {sale.customer_name && sale.customer_name !== 'Anonymous' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <div className="flex justify-between text-sm">
                     <span>Customer:</span>
                     <span>{sale.customer_name}</span>
                   </div>
                 )}
               </div>
 
-              <div className="divider" style={{ borderTop: '1px dashed #000', margin: '10px 0' }}></div>
+              <div className="double-line"></div>
 
-              {/* Items */}
-              <div style={{ marginBottom: '15px' }}>
-                {sale.items.map((item, index) => (
-                  <div key={index} style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                      <span style={{ maxWidth: '60%', wordWrap: 'break-word' }}>{item.name}</span>
-                      <span>{formatCurrency(item.price * item.quantity)}</span>
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#666', marginLeft: '2px' }}>
-                      {item.quantity} x {formatCurrency(item.price)} each
-                    </div>
-                  </div>
-                ))}
+              <div className="items-header bold">
+                <span>QTY</span>
+                <span>ITEM</span>
+                <span>AMOUNT</span>
               </div>
+              <div className="line"></div>
+              {sale.items.map((item, index) => (
+                <div key={index} className="item-row text-sm">
+                  <span>{item.quantity}</span>
+                  <span className="truncate max-w-[100px]">{item.name}</span>
+                  <span>{formatCurrency(item.price * item.quantity)}</span>
+                </div>
+              ))}
 
-              <div className="divider" style={{ borderTop: '1px dashed #000', margin: '10px 0' }}></div>
-
-              {/* Totals */}
-              <div className="total-section" style={{ marginTop: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <div className="double-line"></div>
+              <div className="section text-sm">
+                <div className="flex justify-between">
                   <span>Subtotal:</span>
                   <span>{formatCurrency(sale.subtotal)}</span>
                 </div>
-                
                 {sale.discount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', color: '#008000' }}>
+                  <div className="flex justify-between text-green-600">
                     <span>Discount:</span>
                     <span>-{formatCurrency(sale.discount)}</span>
                   </div>
                 )}
-                
                 {sale.tax > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <div className="flex justify-between">
                     <span>Tax:</span>
                     <span>{formatCurrency(sale.tax)}</span>
                   </div>
                 )}
-
-                <div className="double-divider" style={{ borderTop: '2px solid #000', margin: '10px 0' }}></div>
-                
-                <div className="grand-total" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                <div className="double-line"></div>
+                <div className="flex justify-between font-bold">
                   <span>TOTAL:</span>
                   <span>{formatCurrency(sale.total)}</span>
                 </div>
+              </div>
 
-                <div className="divider" style={{ borderTop: '1px dashed #000', margin: '10px 0' }}></div>
-
-                {/* Payment Method */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <div className="line"></div>
+              <div className="section text-sm">
+                <div className="flex justify-between">
                   <span>Payment:</span>
                   <span>{sale.payment_method}</span>
                 </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <div className="flex justify-between">
                   <span>Amount Paid:</span>
                   <span>{formatCurrency(sale.total)}</span>
                 </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <div className="flex justify-between">
                   <span>Change:</span>
                   <span>{formatCurrency(0)}</span>
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="footer text-center" style={{ textAlign: 'center', marginTop: '15px', fontSize: '10px', borderTop: '1px dashed #000', paddingTop: '10px' }}>
-                <div className="thank-you" style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                  THANK YOU FOR YOUR BUSINESS!
-                </div>
-                <div style={{ marginBottom: '3px' }}>
-                  Items sold are not returnable
-                </div>
-                <div style={{ marginBottom: '3px' }}>
-                  Keep this receipt for your records
-                </div>
-                <div style={{ marginBottom: '8px' }}>
-                  Visit us again soon!
-                </div>
-                <div style={{ fontSize: '8px', marginTop: '10px' }}>
-                  Transaction ID: {sale.id}
-                </div>
-                <div style={{ fontSize: '8px' }}>
+              <div className="line"></div>
+              <div className="center text-sm mt-2"> 
+                <div className="text-xs mt-2">
+                  Transaction ID: {sale.id}<br />
                   {sale.is_in_person ? 'In-Store Purchase' : 'Online Order'}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700">
-              <Printer className="mr-2 h-4 w-4" />
-              Print Receipt
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={handlePrint} className="bg-green-600 text-white hover:bg-green-700">
+              <Printer className="mr-2 h-4 w-4" /> Print Receipt
             </Button>
           </div>
         </div>

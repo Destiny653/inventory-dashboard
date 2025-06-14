@@ -96,7 +96,7 @@ export default function LoginPage() {
                 } else {
                     // User doesn't have admin or vendor role
                     await supabase.auth.signOut()
-                    router.push('/unauthorized')
+                    router.push('/welcome')
                     return
                 }
             }
