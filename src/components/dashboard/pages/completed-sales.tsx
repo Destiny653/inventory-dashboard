@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -254,7 +254,7 @@ const Receipt = ({ sale, onClose }: { sale: CompletedSale; onClose: () => void }
   );
 };
 
-export default function CompletedSalesPage() {
+export function CompletedSalesPage() {
   const [sales, setSales] = useState<CompletedSale[]>([])
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)

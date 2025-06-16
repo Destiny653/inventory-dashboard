@@ -107,9 +107,9 @@ export function Sidebar({ className }: { className?: string }) {
 
   // Sales submenu items (only for vendors)
   const salesItems = [
-    { name: 'Direct Sales', href: '/dashboard/direct-sales', icon: FileText },
-    { name: 'Completed Sales', href: '/dashboard/completed-sales', icon: FileText },
-    { name: 'Completed Orders', href: '/dashboard/completed-orders', icon: FileText }
+    { name: 'Direct Sales', href: `/dashboard${isAdmin ? '/admin' : ''}/sales/direct-sales`, icon: FileText },
+    { name: 'Completed Sales', href: `/dashboard${isAdmin ? '/admin' : ''}/sales/completed-sales`, icon: FileText },
+    { name: 'Completed Orders', href: `/dashboard${isAdmin ? '/admin' : ''}/sales/completed-orders`, icon: FileText }
   ]
 
   // Show loading state
@@ -175,8 +175,7 @@ export function Sidebar({ className }: { className?: string }) {
           )
         })}
         
-        {/* Sales Dropdown Section - Only show for vendors */}
-        {isVendor && (
+        {/* Sales Dropdown Section - Only show for vendors */} 
           <div className="mb-2">
             <button
               onClick={() => setIsSalesOpen(!isSalesOpen)}
@@ -220,8 +219,7 @@ export function Sidebar({ className }: { className?: string }) {
                 })}
               </div>
             )}
-          </div>
-        )}
+          </div> 
       </nav>
       
       {/* Optional: Add a footer section */}

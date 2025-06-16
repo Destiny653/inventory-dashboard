@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -38,7 +38,7 @@ interface Category {
   name: string;
 }
 
-export default function DirectSalesPage() {
+export function DirectSalesPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [paginatedProducts, setPaginatedProducts] = useState<Product[]>([])

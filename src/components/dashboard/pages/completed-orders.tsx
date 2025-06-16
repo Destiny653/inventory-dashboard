@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -87,7 +87,7 @@ interface CompletedOrder {
 
 const ITEMS_PER_PAGE = 10
 
-export default function CompletedOrdersPage() {
+export function CompletedOrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<CompletedOrder[]>([])
   const [loading, setLoading] = useState(true)
