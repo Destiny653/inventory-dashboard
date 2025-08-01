@@ -33,7 +33,7 @@ const vendorLinks = [
 ]
 
 const adminLinks = [
-  { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Vendors', href: '/dashboard/admin/vendors', icon: Store },
   { name: 'Products', href: '/dashboard/admin/products', icon: Package },
   { name: 'Orders', href: '/dashboard/admin/orders', icon: ShoppingCart },
