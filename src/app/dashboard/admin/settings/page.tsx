@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Loader2, UserPlus, Edit, Trash2 } from 'lucide-react'
 
@@ -100,8 +100,14 @@ export default function AdminSettingsPage() {
   const fetchUsers = async () => {
     setIsLoadingUsers(true)
     try {
-      // Get all auth users with their metadata
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
+      // Check if admin client is available
+      if (!supabaseAdmin) {
+        toast.error('Admin client not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.')
+        return
+      }
+
+      // Get all auth users with their metadata using admin client
+      const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
       
       if (authError) {
         console.error('Error fetching auth users:', authError)
@@ -134,8 +140,14 @@ export default function AdminSettingsPage() {
   const updateUserRole = async (userId: string, email: string, role: string, fullName?: string) => {
     setIsUpdatingRole(true)
     try {
-      // Get current user metadata
-      const { data: currentUser, error: fetchError } = await supabase.auth.admin.getUserById(userId)
+      // Check if admin client is available
+      if (!supabaseAdmin) {
+        toast.error('Admin client not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.')
+        return
+      }
+
+      // Get current user metadata using admin client
+      const { data: currentUser, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(userId)
       
       if (fetchError) {
         console.error('Error fetching user:', fetchError)
@@ -151,8 +163,8 @@ export default function AdminSettingsPage() {
         full_name: fullName || currentMetadata.full_name || currentMetadata.name || 'User'
       }
 
-      // Update user metadata with new role
-      const { error } = await supabase.auth.admin.updateUserById(userId, {
+      // Update user metadata with new role using admin client
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: updatedMetadata
       })
 

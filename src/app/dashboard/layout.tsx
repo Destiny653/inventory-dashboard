@@ -49,7 +49,7 @@ export default function DashboardLayout({
             avatar: user.user_metadata.avatar_url, 
           }} 
         />
-        <main className="flex-1 overflow-y-auto p-4 bg-theme-50 dark:bg-theme-900 w-full">
+        <main className="flex-1 overflow-y-auto p-4 bg-theme-50 dark:bg-theme-900 h-[calc(100vh-64px)] w-full">
           {children}
         </main>
       </div>

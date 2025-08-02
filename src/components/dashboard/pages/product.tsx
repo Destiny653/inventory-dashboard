@@ -43,7 +43,7 @@ export  function ProductsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const itemsPerPage = 10
+  const itemsPerPage = 9
 
   useEffect(() => {
     fetchProducts()
