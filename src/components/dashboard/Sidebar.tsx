@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -14,7 +14,9 @@ import {
   Store,
   FileText,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Menu,
+  X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/context/ThemeContext'
@@ -54,6 +56,7 @@ export function Sidebar({ className }: { className?: string }) {
   const [isSalesOpen, setIsSalesOpen] = useState(false)
   const [userRole, setUserRole] = useState<string>('customer')
   const [isLoading, setIsLoading] = useState(true)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   
   // Get user role from Supabase metadata
   useEffect(() => {
@@ -115,9 +118,12 @@ export function Sidebar({ className }: { className?: string }) {
   // Show loading state
   if (isLoading) {
     return (
-      <div className={cn("w-60 h-full flex flex-col border-r border-theme-100 bg-blue-600", className)}>
-        <div className="p-4 border-b border-blue-500/30">
-          <h1 className="text-xl font-bold text-white">Loading...</h1>
+      <div className={cn("h-full flex flex-col border-r border-theme-100 bg-blue-600 transition-all duration-300", isCollapsed ? "w-16" : "w-60", className)}>
+        <div className="p-4 border-b border-blue-500/30 flex justify-between items-center">
+          {!isCollapsed && <h1 className="text-xl font-bold text-white">Loading...</h1>}
+          <button onClick={() => setIsCollapsed(!isCollapsed)} className="text-white">
+            {isCollapsed ? <Menu size={20} /> : <X size={20} />}
+          </button>
         </div>
       </div>
     )
@@ -138,11 +144,19 @@ export function Sidebar({ className }: { className?: string }) {
   }
   
   return (
-    <div className={cn("w-60 h-full flex flex-col border-r border-theme-100 bg-blue-600", className)}>
-      <div className="p-4 border-b border-blue-500/30">
-        <h1 className="text-xl font-bold text-white">
-          {getDashboardTitle(userRole)}
-        </h1>
+    <div className={cn("h-full flex flex-col border-r border-theme-100 bg-blue-600 transition-all duration-300", isCollapsed ? "w-16" : "w-60", className)}>
+      <div className="p-4 border-b border-blue-500/30 flex justify-between items-center">
+        {!isCollapsed && (
+          <h1 className="text-xl font-bold text-white">
+            {getDashboardTitle(userRole)}
+          </h1>
+        )}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)} 
+          className="text-white hover:bg-blue-700/50 p-1 rounded"
+        >
+          {isCollapsed ? <Menu size={20} /> : <X size={20} />}
+        </button>
       </div>
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
         {links.map((link) => { 
@@ -153,29 +167,35 @@ export function Sidebar({ className }: { className?: string }) {
               key={link.name}
               href={link.href}
               className={cn(
-                "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
+                "flex items-center px-3 py-2 text-sm rounded-md transition-colors group",
                 isActive
                   ? "bg-blue-700 text-white font-medium border-l-2 border-white"
                   : "text-blue-100 hover:bg-blue-700/50 hover:text-white"
               )}
+              title={isCollapsed ? link.name : undefined}
             >
               <link.icon className={cn(
-                "w-4 h-4 mr-3 shrink-0",
+                "w-4 h-4 shrink-0",
+                isCollapsed ? "mx-auto" : "mr-3",
                 isActive ? "text-white" : "text-blue-200"
               )} />
-              {link.name}
-              
-              {/* Optional: Add indicator for items needing attention */}
-              {link.name === 'Stock Alerts' && (
-                <span className="ml-auto h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-                  3
-                </span>
+              {!isCollapsed && (
+                <>
+                  {link.name}
+                  {/* Optional: Add indicator for items needing attention */}
+                  {link.name === 'Stock Alerts' && (
+                    <span className="ml-auto h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                      3
+                    </span>
+                  )}
+                </>
               )}
             </Link>
           )
         })}
         
         {/* Sales Dropdown Section - Only show for vendors */} 
+        {(isVendor || isAdmin) && (
           <div className="mb-2">
             <button
               onClick={() => setIsSalesOpen(!isSalesOpen)}
@@ -187,18 +207,21 @@ export function Sidebar({ className }: { className?: string }) {
               )}
             >
               <div className="flex items-center">
-                <ShoppingCart className="w-4 h-4 mr-3 shrink-0" />
-                <span>Sales</span>
+                <ShoppingCart className={cn(
+                  "w-4 h-4 shrink-0",
+                  isCollapsed ? "mx-auto" : "mr-3"
+                )} />
+                {!isCollapsed && <span>Sales</span>}
               </div>
-              {isSalesOpen ? (
+              {!isCollapsed && (isSalesOpen ? (
                 <ChevronUp className="w-4 h-4" />
               ) : (
                 <ChevronDown className="w-4 h-4" />
-              )}
+              ))}
             </button>
             
-            {isSalesOpen && (
-              <div className="ml-6 mt-1 space-y-1">
+            {isSalesOpen && !isCollapsed && (
+              <div className="ml-6 mt-1 space-y-1 overflow-hidden">
                 {salesItems.map((item) => {
                   const isActive = pathname === item.href
                   return (
@@ -219,19 +242,29 @@ export function Sidebar({ className }: { className?: string }) {
                 })}
               </div>
             )}
-          </div> 
+          </div>
+        )}
       </nav>
       
       {/* Optional: Add a footer section */}
       <div className="p-4 mt-auto border-t border-blue-500/30">
-        <div className="flex items-center gap-2 text-sm text-white">
-          <div className="h-2 w-2 rounded-full bg-green-400"></div>
-          <span>Store Online</span>
-        </div>
-        {/* Show current role for debugging */}
-        <div className="mt-2 text-xs text-blue-200 capitalize">
-          Role: {userRole}
-        </div>
+        {!isCollapsed && (
+          <>
+            <div className="flex items-center gap-2 text-sm text-white">
+              <div className="h-2 w-2 rounded-full bg-green-400"></div>
+              <span>Store Online</span>
+            </div>
+            {/* Show current role for debugging */}
+            <div className="mt-2 text-xs text-blue-200 capitalize">
+              Role: {userRole}
+            </div>
+          </>
+        )}
+        {isCollapsed && (
+          <div className="flex justify-center">
+            <div className="h-2 w-2 rounded-full bg-green-400"></div>
+          </div>
+        )}
       </div>
     </div>
   )

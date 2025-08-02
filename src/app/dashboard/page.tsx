@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -13,24 +13,61 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  AreaChart,
+  Area
 } from 'recharts'
 import { ArrowUpRight, ArrowDownRight, Package, ShoppingCart, AlertTriangle, CreditCard, DollarSign, Loader2 } from 'lucide-react'
 
-// Color scheme constants
+// Enhanced color scheme
 const COLORS = {
-  primary: 'bg-blue-500',
-  primaryLight: 'bg-blue-400',
-  secondary: 'bg-purple-500',
-  success: 'bg-green-500',
-  warning: 'bg-amber-500',
-  danger: 'bg-red-500',
-  info: 'bg-cyan-500',
-  textPrimary: 'text-gray-800',
-  textSecondary: 'text-gray-600',
-  border: 'border-gray-200',
-  chartLine: '#6366f1', // indigo-500
-  chartBar: '#8b5cf6', // violet-500
+  primary: {
+    light: '#EFF6FF',
+    main: '#3B82F6',
+    dark: '#2563EB',
+    text: '#1E40AF'
+  },
+  secondary: {
+    light: '#F5F3FF',
+    main: '#8B5CF6',
+    dark: '#7C3AED',
+    text: '#5B21B6'
+  },
+  success: {
+    light: '#ECFDF5',
+    main: '#10B981',
+    dark: '#059669',
+    text: '#065F46'
+  },
+  warning: {
+    light: '#FFFBEB',
+    main: '#F59E0B',
+    dark: '#D97706',
+    text: '#92400E'
+  },
+  danger: {
+    light: '#FEF2F2',
+    main: '#EF4444',
+    dark: '#DC2626',
+    text: '#991B1B'
+  },
+  background: {
+    light: '#F9FAFB',
+    main: '#FFFFFF',
+    dark: '#F3F4F6'
+  },
+  text: {
+    primary: '#111827',
+    secondary: '#6B7280',
+    muted: '#9CA3AF'
+  },
+  border: '#E5E7EB',
+  chart: {
+    line: '#3B82F6',
+    area: '#93C5FD',
+    bar: '#60A5FA',
+    grid: '#E5E7EB'
+  }
 }
 
 export default function DashboardPage() {
@@ -152,18 +189,20 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard Overview</h1>
+    <div className="space-y-6 p-4 bg-gray-50">
+      <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-blue-500" />
+            <div className="p-2 rounded-full bg-blue-100">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-800">${stats.totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gray-900">${stats.totalRevenue.toLocaleString()}</div>
             <p className="text-xs text-gray-500 flex items-center mt-1">
               <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
               <span className="text-green-500">+20.1%</span> from last month
@@ -171,13 +210,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-purple-500" />
+            <div className="p-2 rounded-full bg-purple-100">
+              <ShoppingCart className="h-4 w-4 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-800">{stats.totalOrders}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalOrders}</div>
             <p className="text-xs text-gray-500 flex items-center mt-1">
               <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
               <span className="text-green-500">+12.2%</span> from last month
@@ -185,39 +226,45 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Products</CardTitle>
-            <Package className="h-4 w-4 text-amber-500" />
+            <div className="p-2 rounded-full bg-amber-100">
+              <Package className="h-4 w-4 text-amber-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-800">{stats.totalProducts}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalProducts}</div>
             <div className="text-xs text-gray-500 mt-1">
               <span className="text-amber-600">{stats.lowStockItems} items</span> low in stock
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Pending Payouts</CardTitle>
-            <CreditCard className="h-4 w-4 text-red-500" />
+            <div className="p-2 rounded-full bg-red-100">
+              <CreditCard className="h-4 w-4 text-red-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-800">{stats.pendingPayouts}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.pendingPayouts}</div>
             <div className="text-xs text-gray-500 mt-1">
               Requires your attention
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Low Stock</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <div className="p-2 rounded-full bg-amber-100">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-800">{stats.lowStockItems}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.lowStockItems}</div>
             <div className="text-xs text-gray-500 mt-1">
               Products need restocking
             </div>
@@ -227,94 +274,112 @@ export default function DashboardPage() {
 
       {/* Charts and Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-gray-200 shadow-sm bg-white">
           <CardHeader>
-            <CardTitle className="text-gray-800">Recent Sales</CardTitle>
+            <CardTitle className="text-gray-900">Revenue Trend (7 Days)</CardTitle>
           </CardHeader>
           <CardContent className="pt-2">
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart
+                <AreaChart
                   data={recentSales}
                   margin={{
-                    top: 5,
+                    top: 10,
                     right: 20,
-                    left: 10,
-                    bottom: 5,
+                    left: 0,
+                    bottom: 0,
                   }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.chart.area} stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor={COLORS.chart.area} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} vertical={false} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    stroke="#d1d5db"
+                    tick={{ fill: COLORS.text.secondary, fontSize: 12 }}
+                    tickMargin={10}
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'short' })}
+                    stroke={COLORS.border}
                   />
                   <YAxis 
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                    stroke="#d1d5db"
+                    tick={{ fill: COLORS.text.secondary, fontSize: 12 }}
+                    stroke={COLORS.border}
+                    tickFormatter={(value) => `$${value}`}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderColor: '#e5e7eb',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                      backgroundColor: COLORS.background.main,
+                      borderColor: COLORS.border,
+                      borderRadius: '0.375rem',
+                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                      color: COLORS.text.primary
                     }}
-                    formatter={(value) => [`$${value}`, 'Sales']}
-                    labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    formatter={(value) => [`$${value}`, 'Revenue']}
+                    labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="sales"
-                    stroke={COLORS.chartLine}
+                    stroke={COLORS.chart.line}
                     strokeWidth={2}
-                    activeDot={{ r: 6, fill: COLORS.chartLine }}
-                    dot={{ r: 3 }}
+                    fillOpacity={1}
+                    fill="url(#colorSales)"
+                    activeDot={{ r: 6, fill: COLORS.primary.main }}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-gray-200 shadow-sm bg-white">
           <CardHeader>
-            <CardTitle className="text-gray-800">Quick Actions</CardTitle>
+            <CardTitle className="text-gray-900">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <a 
                   href="/dashboard/products" 
-                  className="p-4 border border-gray-200 rounded-lg hover:bg-blue-50 transition-colors flex flex-col items-center justify-center text-center"
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-blue-50 transition-colors flex flex-col items-center justify-center text-center bg-white hover:shadow-sm"
                 >
-                  <Package className="h-8 w-8 mb-2 text-blue-600" />
-                  <span className="font-medium text-gray-700">Add New Product</span>
+                  <div className="p-3 rounded-full bg-blue-100 mb-2">
+                    <Package className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <span className="font-medium text-gray-900">Add New Product</span>
                   <span className="text-xs text-gray-500 mt-1">Manage inventory</span>
                 </a>
                 <a 
                   href="/dashboard/orders" 
-                  className="p-4 border border-gray-200 rounded-lg hover:bg-purple-50 transition-colors flex flex-col items-center justify-center text-center"
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-purple-50 transition-colors flex flex-col items-center justify-center text-center bg-white hover:shadow-sm"
                 >
-                  <ShoppingCart className="h-8 w-8 mb-2 text-purple-600" />
-                  <span className="font-medium text-gray-700">View Orders</span>
+                  <div className="p-3 rounded-full bg-purple-100 mb-2">
+                    <ShoppingCart className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <span className="font-medium text-gray-900">View Orders</span>
                   <span className="text-xs text-gray-500 mt-1">Process new orders</span>
                 </a>
                 <a 
                   href="/dashboard/stock-alerts" 
-                  className="p-4 border border-gray-200 rounded-lg hover:bg-amber-50 transition-colors flex flex-col items-center justify-center text-center"
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-amber-50 transition-colors flex flex-col items-center justify-center text-center bg-white hover:shadow-sm"
                 >
-                  <AlertTriangle className="h-8 w-8 mb-2 text-amber-600" />
-                  <span className="font-medium text-gray-700">Stock Alerts</span>
+                  <div className="p-3 rounded-full bg-amber-100 mb-2">
+                    <AlertTriangle className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <span className="font-medium text-gray-900">Stock Alerts</span>
                   <span className="text-xs text-gray-500 mt-1">{stats.lowStockItems} items need attention</span>
                 </a>
                 <a 
                   href="/dashboard/payouts" 
-                  className="p-4 border border-gray-200 rounded-lg hover:bg-green-50 transition-colors flex flex-col items-center justify-center text-center"
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-green-50 transition-colors flex flex-col items-center justify-center text-center bg-white hover:shadow-sm"
                 >
-                  <CreditCard className="h-8 w-8 mb-2 text-green-600" />
-                  <span className="font-medium text-gray-700">Request Payout</span>
+                  <div className="p-3 rounded-full bg-green-100 mb-2">
+                    <CreditCard className="h-6 w-6 text-green-600" />
+                  </div>
+                  <span className="font-medium text-gray-900">Request Payout</span>
                   <span className="text-xs text-gray-500 mt-1">Withdraw your earnings</span>
                 </a>
               </div>
@@ -323,10 +388,10 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Additional chart - Monthly Revenue */}
-      <Card className="border border-gray-200 shadow-sm">
+      {/* Additional chart - Sales Distribution */}
+      <Card className="border border-gray-200 shadow-sm bg-white">
         <CardHeader>
-          <CardTitle className="text-gray-800">Monthly Revenue</CardTitle>
+          <CardTitle className="text-gray-900">Sales Distribution</CardTitle>
         </CardHeader>
         <CardContent className="pt-2">
           <div className="h-[300px]">
@@ -334,36 +399,39 @@ export default function DashboardPage() {
               <BarChart
                 data={recentSales}
                 margin={{
-                  top: 5,
+                  top: 10,
                   right: 20,
-                  left: 10,
-                  bottom: 5,
+                  left: 0,
+                  bottom: 0,
                 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#6b7280', fontSize: 12 }}
-                  tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  stroke="#d1d5db"
+                  tick={{ fill: COLORS.text.secondary, fontSize: 12 }}
+                  tickMargin={10}
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'short' })}
+                  stroke={COLORS.border}
                 />
                 <YAxis 
-                  tick={{ fill: '#6b7280', fontSize: 12 }}
-                  stroke="#d1d5db"
+                  tick={{ fill: COLORS.text.secondary, fontSize: 12 }}
+                  stroke={COLORS.border}
+                  tickFormatter={(value) => `$${value}`}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#ffffff',
-                    borderColor: '#e5e7eb',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    backgroundColor: COLORS.background.main,
+                    borderColor: COLORS.border,
+                    borderRadius: '0.375rem',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                    color: COLORS.text.primary
                   }}
                   formatter={(value) => [`$${value}`, 'Revenue']}
-                  labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 />
                 <Bar
                   dataKey="sales"
-                  fill={COLORS.chartBar}
+                  fill={COLORS.chart.bar}
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>

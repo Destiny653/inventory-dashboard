@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -48,19 +48,21 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Search, MoreVertical, UserPlus, Filter, FileText, ShieldAlert, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Search, MoreVertical, UserPlus, Filter, FileText, ShieldAlert, CheckCircle, XCircle, AlertTriangle, Loader2, Edit, Trash2 } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 interface Vendor {
-    id: number;
-    name: string;
-    company: string;
+    id: string;
     email: string;
-    phone: string;
-    status: string;
-    products_count: number;
-    total_sales: number;
-    joined_date: string;
-    avatar_url: string;
+    full_name?: string;
+    phone?: string;
+    created_at: string;
+    role?: string;
+    avatar_url?: string;
+    status?: string;
+    products_count?: number;
+    total_sales?: number;
 }
 
 export default function AdminVendorsPage() {
@@ -71,6 +73,7 @@ export default function AdminVendorsPage() {
     const [statusFilter, setStatusFilter] = useState('all')
     const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false)
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
     useEffect(() => {
         fetchVendors()
@@ -84,75 +87,42 @@ export default function AdminVendorsPage() {
         try {
             setLoading(true)
 
-            // In a real app, this would be a Supabase query
-            // Mock data for demonstration
-            const mockVendors = [
-                {
-                    id: 1,
-                    name: 'Jane Cooper',
-                    company: 'Cooper Crafts',
-                    email: 'jane@coopercrafts.com',
-                    phone: '(555) 123-4567',
-                    status: 'active',
-                    products_count: 48,
-                    total_sales: 24780,
-                    joined_date: '2023-08-15T00:00:00Z',
-                    avatar_url: 'https://i.pravatar.cc/150?img=1',
-                },
-                {
-                    id: 2,
-                    name: 'Robert Fox',
-                    company: 'Fox Electronics',
-                    email: 'robert@foxelectronics.com',
-                    phone: '(555) 234-5678',
-                    status: 'active',
-                    products_count: 32,
-                    total_sales: 18650,
-                    joined_date: '2023-09-22T00:00:00Z',
-                    avatar_url: 'https://i.pravatar.cc/150?img=8',
-                },
-                {
-                    id: 3,
-                    name: 'Leslie Alexander',
-                    company: 'Alexander Apparel',
-                    email: 'leslie@alexanderapparel.com',
-                    phone: '(555) 345-6789',
-                    status: 'pending',
-                    products_count: 0,
-                    total_sales: 0,
-                    joined_date: '2025-03-18T00:00:00Z',
-                    avatar_url: 'https://i.pravatar.cc/150?img=3',
-                },
-                {
-                    id: 4,
-                    name: 'Esther Howard',
-                    company: 'Howard Home Goods',
-                    email: 'esther@howardhome.com',
-                    phone: '(555) 456-7890',
-                    status: 'suspended',
-                    products_count: 15,
-                    total_sales: 8920,
-                    joined_date: '2024-01-10T00:00:00Z',
-                    avatar_url: 'https://i.pravatar.cc/150?img=4',
-                },
-                {
-                    id: 5,
-                    name: 'Cameron Williamson',
-                    company: 'Williamson Wares',
-                    email: 'cameron@williamsonwares.com',
-                    phone: '(555) 567-8901',
-                    status: 'active',
-                    products_count: 27,
-                    total_sales: 15340,
-                    joined_date: '2024-02-05T00:00:00Z',
-                    avatar_url: 'https://i.pravatar.cc/150?img=5',
-                },
-            ]
+            // Check if admin client is available
+            if (!supabaseAdmin) {
+                toast.error('Admin client not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.')
+                return
+            }
 
-            setVendors(mockVendors)
-            setFilteredVendors(mockVendors)
+            // Get all users with vendor role
+            const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
+            
+            if (authError) {
+                console.error('Error fetching vendors:', authError)
+                toast.error('Failed to fetch vendors')
+                return
+            }
+
+            // Filter users with vendor role and convert to Vendor format
+            const vendorUsers: Vendor[] = authUsers.users
+                .filter(user => user.user_metadata?.role === 'vendor')
+                .map(user => ({
+                    id: user.id,
+                    email: user.email || '',
+                    full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'N/A',
+                    phone: user.phone || 'N/A',
+                    created_at: user.created_at,
+                    role: user.user_metadata?.role || 'vendor',
+                    avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+                    status: user.user_metadata?.status || 'active',
+                    products_count: user.user_metadata?.products_count || 0,
+                    total_sales: user.user_metadata?.total_sales || 0
+                }))
+
+            setVendors(vendorUsers)
+            setFilteredVendors(vendorUsers)
         } catch (error) {
             console.error('Error fetching vendors:', error)
+            toast.error('Failed to fetch vendors')
         } finally {
             setLoading(false)
         }
@@ -164,8 +134,7 @@ export default function AdminVendorsPage() {
         // Apply search filter
         if (searchTerm) {
             filtered = filtered.filter(vendor =>
-                vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                vendor.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                vendor.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 vendor.email.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
@@ -186,7 +155,7 @@ export default function AdminVendorsPage() {
         });
     };
 
-    const getStatusBadge = (status: string) => {
+    const getStatusBadge = (status?: string) => {
         switch (status) {
             case 'active':
                 return <Badge className="bg-green-100 text-green-800">Active</Badge>;
@@ -195,43 +164,98 @@ export default function AdminVendorsPage() {
             case 'suspended':
                 return <Badge className="bg-red-100 text-red-800">Suspended</Badge>;
             default:
-                return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
+                return <Badge className="bg-green-100 text-green-800">Active</Badge>;
         }
     };
 
-    const updateVendorStatus = async (vendorId: number, newStatus: string) => {
+    const updateVendorStatus = async (vendorId: string, newStatus: string) => {
         try {
-            // In a real app, this would update the vendor in Supabase
+            setIsUpdatingStatus(true)
+
+            if (!supabaseAdmin) {
+                toast.error('Admin client not configured.')
+                return
+            }
+
+            // Get current user metadata
+            const { data: currentUser, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(vendorId)
+            
+            if (fetchError) {
+                console.error('Error fetching vendor:', fetchError)
+                toast.error('Failed to fetch vendor data')
+                return
+            }
+
+            // Prepare updated metadata
+            const currentMetadata = currentUser.user.user_metadata || {}
+            const updatedMetadata = {
+                ...currentMetadata,
+                status: newStatus
+            }
+
+            // Update user metadata with new status
+            const { error } = await supabaseAdmin.auth.admin.updateUserById(vendorId, {
+                user_metadata: updatedMetadata
+            })
+
+            if (error) {
+                console.error('Error updating vendor status:', error)
+                toast.error('Failed to update vendor status')
+                return
+            }
+
+            // Update local state
             setVendors(vendors.map(vendor =>
                 vendor.id === vendorId ? { ...vendor, status: newStatus } : vendor
             ));
-        } catch (error: any) {
-            console.error('Error updating vendor status:', error);
+
+            toast.success(`Vendor status updated to ${newStatus}`)
+        } catch (error) {
+            console.error('Error updating vendor status:', error)
+            toast.error('Failed to update vendor status')
+        } finally {
+            setIsUpdatingStatus(false)
         }
     };
 
-    const deleteVendor = async (vendorId: number) => {
+    const deleteVendor = async (vendorId: string) => {
         try {
-            // In a real app, this would delete the vendor from Supabase
+            if (!supabaseAdmin) {
+                toast.error('Admin client not configured.')
+                return
+            }
+
+            // Delete user from Supabase Auth
+            const { error } = await supabaseAdmin.auth.admin.deleteUser(vendorId)
+
+            if (error) {
+                console.error('Error deleting vendor:', error)
+                toast.error('Failed to delete vendor')
+                return
+            }
+
+            // Update local state
             setVendors(vendors.filter(vendor => vendor.id !== vendorId));
             setIsDeleteAlertOpen(false);
-        } catch (error: any) {
-            console.error('Error deleting vendor:', error);
+            toast.success('Vendor deleted successfully')
+        } catch (error) {
+            console.error('Error deleting vendor:', error)
+            toast.error('Failed to delete vendor')
         }
     };
 
     if (loading) {
-        return <div className="flex justify-center items-center h-64">Loading vendors...</div>;
+        return (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
     }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Vendor Management</h1>
-                {/* <Button className="flex items-center gap-2">
-                    <UserPlus className="h-4 w-4" />
-                    Add Vendor
-                </Button> */}
             </div>
 
             <Card>
@@ -241,17 +265,17 @@ export default function AdminVendorsPage() {
                 <CardContent>
                     <div className="flex flex-col md:flex-row gap-4 mb-6">
                         <div className="relative flex-1">
-                            {/* <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                             <Input
                                 placeholder="Search vendors..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-8"
-                            /> */}
+                            />
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {/* <Filter className="h-4 w-4 text-gray-500" /> */}
+                            <Filter className="h-4 w-4 text-gray-500" />
                             <Tabs
                                 value={statusFilter}
                                 onValueChange={setStatusFilter}
@@ -267,45 +291,49 @@ export default function AdminVendorsPage() {
                         </div>
                     </div>
 
-                    {vendors.length === 0 ? (
+                    {filteredVendors.length === 0 ? (
                         <div className="text-center py-10">
                             <p className="text-gray-500">No vendors found matching your criteria</p>
                         </div>
                     ) : (
-                        <div className="rounded-md border">
+                        <div className="border rounded-lg overflow-hidden shadow-sm">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Vendor</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Products</TableHead>
-                                        <TableHead>Total Sales</TableHead>
-                                        <TableHead>Joined</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                <TableHeader className="bg-theme-50 dark:bg-theme-900">
+                                    <TableRow className="border-b border-theme-200 dark:border-theme-800">
+                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Vendor</TableHead>
+                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Status</TableHead>
+                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Products</TableHead>
+                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Total Sales</TableHead>
+                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Joined</TableHead>
+                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {vendors.map((vendor) => (
-                                        <TableRow key={vendor.id}>
+                                    {filteredVendors.map((vendor, index) => (
+                                        <TableRow 
+                                            key={vendor.id} 
+                                            className={`border-b border-theme-100 dark:border-theme-800 hover:bg-theme-50 dark:hover:bg-theme-900/50 transition-all duration-200 ${
+                                                index % 2 === 0 ? 'bg-white dark:bg-theme-950' : 'bg-theme-50 dark:bg-theme-900/50'
+                                            }`}
+                                        >
                                             <TableCell>
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar>
-                                                        <AvatarImage src={vendor.avatar_url} alt={vendor.name} />
-                                                        <AvatarFallback>{vendor.name.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-8 h-8 rounded-full bg-theme-primary flex items-center justify-center text-white text-sm font-semibold">
+                                                        {vendor.full_name?.charAt(0) || vendor.email?.charAt(0) || 'V'}
+                                                    </div>
                                                     <div>
-                                                        <div className="font-medium">{vendor.name}</div>
-                                                        <div className="text-sm text-muted-foreground">{vendor.company}</div>
-                                                        <div className="text-xs text-muted-foreground">{vendor.email}</div>
+                                                        <div className="font-medium text-theme-900 dark:text-theme-100">{vendor.full_name}</div>
+                                                        <div className="text-sm text-theme-600 dark:text-theme-300">{vendor.email}</div>
+                                                        <div className="text-xs text-theme-500 dark:text-theme-400">{vendor.phone}</div>
                                                     </div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>{getStatusBadge(vendor.status)}</TableCell>
-                                            <TableCell>{vendor.products_count}</TableCell>
-                                            <TableCell>${vendor.total_sales.toLocaleString()}</TableCell>
-                                            <TableCell>{formatDate(vendor.joined_date)}</TableCell>
+                                            <TableCell className="text-theme-600 dark:text-theme-300">{vendor.products_count || 0}</TableCell>
+                                            <TableCell className="text-theme-600 dark:text-theme-300">${(vendor.total_sales || 0).toLocaleString()}</TableCell>
+                                            <TableCell className="text-theme-600 dark:text-theme-300">{formatDate(vendor.created_at)}</TableCell>
                                             <TableCell className="text-right">
-                                                 <DropdownMenu>
+                                                <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="icon">
                                                             <MoreVertical className="h-4 w-4" />
@@ -321,14 +349,20 @@ export default function AdminVendorsPage() {
                                                         <DropdownMenuSeparator />
 
                                                         {vendor.status !== 'active' && (
-                                                            <DropdownMenuItem onClick={() => updateVendorStatus(vendor.id, 'active')}>
+                                                            <DropdownMenuItem 
+                                                                onClick={() => updateVendorStatus(vendor.id, 'active')}
+                                                                disabled={isUpdatingStatus}
+                                                            >
                                                                 <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
                                                                 Activate Vendor
                                                             </DropdownMenuItem>
                                                         )}
 
                                                         {vendor.status !== 'suspended' && (
-                                                            <DropdownMenuItem onClick={() => updateVendorStatus(vendor.id, 'suspended')}>
+                                                            <DropdownMenuItem 
+                                                                onClick={() => updateVendorStatus(vendor.id, 'suspended')}
+                                                                disabled={isUpdatingStatus}
+                                                            >
                                                                 <ShieldAlert className="mr-2 h-4 w-4 text-amber-500" />
                                                                 Suspend Vendor
                                                             </DropdownMenuItem>
@@ -341,11 +375,11 @@ export default function AdminVendorsPage() {
                                                                 setIsDeleteAlertOpen(true)
                                                             }}
                                                         >
-                                                            <XCircle className="mr-2 h-4 w-4" />
+                                                            <Trash2 className="mr-2 h-4 w-4" />
                                                             Delete Vendor
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
-                                                </DropdownMenu> 
+                                                </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -359,103 +393,79 @@ export default function AdminVendorsPage() {
             {/* Vendor Details Dialog */}
             {selectedVendor && (
                 <Dialog open={selectedVendor !== null && !isDeleteAlertOpen} onOpenChange={(open) => !open && setSelectedVendor(null)}>
-                    <DialogContent className="sm:max-w-[600px]">
-                        <DialogHeader>
-                            <DialogTitle>Vendor Details</DialogTitle>
-                            <DialogDescription>
+                    <DialogContent className="bg-white sm:max-w-[600px] border-0 shadow-lg">
+                        <DialogHeader className="pb-4 border-b border-gray-200">
+                            <DialogTitle className="text-xl font-semibold text-gray-900">
+                                Vendor Details
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-600 mt-2">
                                 Detailed information about the vendor.
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="space-y-6 py-4">
-                            <div className="flex items-center gap-4">
-                                <Avatar className="h-16 w-16">
-                                    <AvatarImage src={selectedVendor.avatar_url} alt={selectedVendor.name} />
-                                    <AvatarFallback>{selectedVendor.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <h3 className="text-lg font-medium">{selectedVendor.name}</h3>
-                                    <p className="text-sm text-muted-foreground">{selectedVendor.company}</p>
-                                    <div className="mt-1">{getStatusBadge(selectedVendor.status)}</div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <h4 className="text-sm font-medium text-muted-foreground">Contact Information</h4>
-                                    <div className="mt-1 space-y-1">
-                                        <p className="text-sm">Email: {selectedVendor.email}</p>
-                                        <p className="text-sm">Phone: {selectedVendor.phone}</p>
+                        <div className="py-6 space-y-6">
+                            {/* Vendor Info */}
+                            <div className="bg-theme-50 dark:bg-theme-900 p-4 rounded-lg border border-theme-200 dark:border-theme-800">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-12 h-12 bg-theme-primary rounded-full flex items-center justify-center">
+                                        <span className="text-white font-semibold text-lg">
+                                            {selectedVendor.full_name?.charAt(0) || 'V'}
+                                        </span>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-medium text-muted-foreground">Store Information</h4>
-                                    <div className="mt-1 space-y-1">
-                                        <p className="text-sm">Products: {selectedVendor.products_count}</p>
-                                        <p className="text-sm">Total Sales: ${selectedVendor.total_sales.toLocaleString()}</p>
-                                        <p className="text-sm">Joined: {formatDate(selectedVendor.joined_date)}</p>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-gray-900 dark:text-gray-100">{selectedVendor.full_name}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{selectedVendor.email}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                                            Joined: {formatDate(selectedVendor.created_at)}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        {getStatusBadge(selectedVendor.status)}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-muted-foreground">Actions</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a href={`/dashboard/admin/products?vendor=${selectedVendor.id}`}>
-                                            View Products
-                                        </a>
-                                    </Button>
-
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a href={`/dashboard/admin/vendors/edit/${selectedVendor.id}`}>
-                                            Edit Vendor
-                                        </a>
-                                    </Button>
-
-                                    {selectedVendor.status !== 'active' && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-green-500"
-                                            onClick={() => {
-                                                updateVendorStatus(selectedVendor.id, 'active')
-                                                setSelectedVendor({ ...selectedVendor, status: 'active' })
-                                            }}
-                                        >
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Activate
-                                        </Button>
-                                    )}
-
-                                    {selectedVendor.status !== 'suspended' && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-amber-500"
-                                            onClick={() => {
-                                                updateVendorStatus(selectedVendor.id, 'suspended')
-                                                setSelectedVendor({ ...selectedVendor, status: 'suspended' })
-                                            }}
-                                        >
-                                            <ShieldAlert className="mr-2 h-4 w-4" />
-                                            Suspend
-                                        </Button>
-                                    )}
-
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-red-500"
-                                        onClick={() => setIsDeleteAlertOpen(true)}
-                                    >
-                                        <XCircle className="mr-2 h-4 w-4" />
-                                        Delete
-                                    </Button>
+                            {/* Contact Information */}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700">Contact Information</Label>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <div className="space-y-2">
+                                            <p className="text-sm"><span className="font-medium">Email:</span> {selectedVendor.email}</p>
+                                            <p className="text-sm"><span className="font-medium">Phone:</span> {selectedVendor.phone}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700">Store Information</Label>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <div className="space-y-2">
+                                            <p className="text-sm"><span className="font-medium">Products:</span> {selectedVendor.products_count || 0}</p>
+                                            <p className="text-sm"><span className="font-medium">Total Sales:</span> ${(selectedVendor.total_sales || 0).toLocaleString()}</p>
+                                            <p className="text-sm"><span className="font-medium">Joined:</span> {formatDate(selectedVendor.created_at)}</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        <DialogFooter className="pt-4 border-t border-gray-200">
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setSelectedVendor(null)}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                            >
+                                Close
+                            </Button>
+                            <Button 
+                                onClick={() => setIsDeleteAlertOpen(true)}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Vendor
+                            </Button>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
             )}

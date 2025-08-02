@@ -1,9 +1,10 @@
- 'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { NotificationService, type Notification } from '@/lib/notificationService'
 import {
   Bell,
   Search,
@@ -14,7 +15,11 @@ import {
   Settings,
   ChevronDown,
   ShoppingCart,
-  Loader2
+  Loader2,
+  Package,
+  AlertTriangle,
+  CheckCircle,
+  Clock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,17 +46,8 @@ import { Sidebar } from './Sidebar'
 import { ThemeSwitcher } from '@/components/ThemeSwitcher'
 import { useTheme } from '../../context/ThemeContext'
 import SignOutButton from '../SignOutButton'
-
-interface Notification {
-  id: string;
-  user_id: string;
-  title: string;
-  message: string;
-  created_at: string;
-  read: boolean;
-  type: 'order' | 'payment' | 'stock' | 'system';
-  metadata?: Record<string, any>;
-}
+import { toast } from 'sonner'
+import Image from 'next/image'
 
 export function Header({ user }: { user: { id: string; name?: string | null; email?: string | null; avatar?: string | null } }) {
   const pathname = usePathname()
@@ -60,6 +56,7 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loadingNotifications, setLoadingNotifications] = useState(true)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
   // Determine user role from path
   const isAdmin = pathname?.includes('/admin')
@@ -78,17 +75,9 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
   async function fetchNotifications() {
     try {
       setLoadingNotifications(true)
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (error) throw error
-
-      setNotifications(data || [])
-      updateUnreadCount(data || [])
+      const notifications = await NotificationService.getUserNotifications(user.id, 10)
+      setNotifications(notifications)
+      updateUnreadCount(notifications)
     } catch (error) {
       console.error('Error fetching notifications:', error)
     } finally {
@@ -108,8 +97,15 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          setNotifications(prev => [payload.new as Notification, ...prev])
+          const newNotification = payload.new as Notification
+          setNotifications(prev => [newNotification, ...prev])
           setUnreadCount(prev => prev + 1)
+          
+          // Show toast for new notifications
+          toast(newNotification.title, {
+            description: newNotification.message,
+            duration: 5000,
+          })
         }
       )
       .subscribe()
@@ -122,19 +118,15 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
 
   async function markAsRead(notificationId: string) {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId)
-
-      if (error) throw error
-
-      setNotifications(prev =>
-        prev.map(n => 
-          n.id === notificationId ? { ...n, read: true } : n
+      const success = await NotificationService.markAsRead(notificationId)
+      if (success) {
+        setNotifications(prev =>
+          prev.map(n => 
+            n.id === notificationId ? { ...n, read: true } : n
+          )
         )
-      )
-      setUnreadCount(prev => prev - 1)
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error)
     }
@@ -142,25 +134,17 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
 
   async function markAllAsRead() {
     try {
-      const unreadIds = notifications
-        .filter(n => !n.read)
-        .map(n => n.id)
-
-      if (unreadIds.length === 0) return
-
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .in('id', unreadIds)
-
-      if (error) throw error
-
-      setNotifications(prev =>
-        prev.map(n => ({ ...n, read: true }))
-      )
-      setUnreadCount(0)
+      const success = await NotificationService.markAllAsRead(user.id)
+      if (success) {
+        setNotifications(prev =>
+          prev.map(n => ({ ...n, read: true }))
+        )
+        setUnreadCount(0)
+        toast.success('All notifications marked as read')
+      }
     } catch (error) {
       console.error('Error marking all notifications as read:', error)
+      toast.error('Failed to mark notifications as read')
     }
   }
 
@@ -175,11 +159,30 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
     return `${Math.floor(seconds / 86400)} days ago`
   }
 
+  function getNotificationIcon(type: string) {
+    switch (type) {
+      case 'order':
+        return <ShoppingCart className="h-4 w-4 text-blue-500" />
+      case 'payment':
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case 'stock':
+        return <AlertTriangle className="h-4 w-4 text-amber-500" />
+      case 'status_update':
+        return <Clock className="h-4 w-4 text-purple-500" />
+      case 'new_signup':
+        return <User className="h-4 w-4 text-indigo-500" />
+      default:
+        return <Bell className="h-4 w-4 text-gray-500" />
+    }
+  }
+
   function getNotificationTitle(type: string) {
     switch (type) {
       case 'order': return 'New Order'
       case 'payment': return 'Payment Received'
       case 'stock': return 'Stock Alert'
+      case 'status_update': return 'Status Update'
+      case 'new_signup': return 'New User'
       case 'system': return 'System Notification'
       default: return 'Notification'
     }
@@ -193,13 +196,15 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
         return `/dashboard/payments/${notification.metadata?.payment_id || ''}`
       case 'stock':
         return `/dashboard/products/${notification.metadata?.product_id || ''}`
+      case 'status_update':
+        return `/dashboard/orders/${notification.metadata?.order_id || ''}`
       default:
         return '/dashboard/notifications'
     }
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b bg-background px-2 md:px-6">
+    <header className="flex h-16 items-center gap-2 md:gap-4 border-b bg-background px-2 md:px-6 flex-shrink-0">
       <Sheet>
         <SheetTrigger asChild>
           <Button variant="outline" size="icon" className="h-8 w-8 md:h-9 md:w-9 md:hidden">
@@ -213,7 +218,7 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
       </Sheet>
 
       <Link href="/" className="flex items-center gap-1 md:gap-3">
-        <span className="font-bold text-base md:text-xl text-theme">MultiVendor</span>
+        <span className="font-bold text-base md:text-xl text-theme"><Image src="/multivendor-logo.png" alt="Logo" width={300} height={400} /></span>
       </Link>
 
       <div className="relative flex-1 md:flex md:justify-center">
@@ -261,16 +266,16 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
           <ThemeSwitcher />
         </div>
 
-        <Popover>
+        <Popover open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="icon" className="relative h-8 w-8 md:h-9 md:w-9">
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
                 <Badge 
-                    variant="secondary" 
-                    className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center"
-                  >
-                  {unreadCount}
+                  variant="secondary" 
+                  className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs"
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </Badge>
               )}
               <span className="sr-only">Notifications</span>
@@ -281,14 +286,14 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
             align="end"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            <div className="p-3 border-b">
+            <div className="p-3 border-b bg-theme-50 dark:bg-theme-900">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium">Notifications</h4>
+                <h4 className="font-medium text-theme-900 dark:text-theme-100">Notifications</h4>
                 {unreadCount > 0 && (
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-auto p-0 text-xs text-theme"
+                    className="h-auto p-0 text-xs text-theme hover:text-theme-600"
                     onClick={markAllAsRead}
                   >
                     Mark all as read
@@ -304,6 +309,7 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
+                  <Bell className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
                   No notifications
                 </div>
               ) : (
@@ -312,30 +318,36 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
                     <Link
                       key={notification.id}
                       href={getNotificationLink(notification)}
-                      onClick={() => markAsRead(notification.id)}
-                      className={`block p-3 hover:bg-muted/50 transition-colors ${
-                        !notification.read ? 'bg-theme-50' : ''
+                      onClick={() => {
+                        markAsRead(notification.id)
+                        setIsNotificationOpen(false)
+                      }}
+                      className={`block p-3 hover:bg-theme-50 dark:hover:bg-theme-900/50 transition-colors ${
+                        !notification.read ? 'bg-theme-50 dark:bg-theme-900/30' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`mt-1 h-2 w-2 rounded-full ${
-                          notification.read ? 'bg-transparent' : 'bg-theme-500'
-                        }`} />
+                        <div className="mt-1">
+                          {getNotificationIcon(notification.type)}
+                        </div>
                         <div className="grid gap-1 flex-1">
                           <div className="font-medium flex justify-between items-start">
-                            <span>{getNotificationTitle(notification.type)}</span>
+                            <span className="text-theme-900 dark:text-theme-100">
+                              {getNotificationTitle(notification.type)}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                               {formatTimeAgo(notification.created_at)}
                             </span>
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-theme-600 dark:text-theme-300">
                             {notification.message}
                           </div>
-                          {notification.metadata && (
-                            <div className="text-xs text-muted-foreground mt-1">
+                          {notification.metadata && Object.keys(notification.metadata).length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1 bg-theme-100 dark:bg-theme-800 p-2 rounded">
                               {Object.entries(notification.metadata).map(([key, value]) => (
-                                <div key={key}>
-                                  <span className="font-medium">{key}:</span> {String(value)}
+                                <div key={key} className="flex justify-between">
+                                  <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>
+                                  <span>{String(value)}</span>
                                 </div>
                               ))}
                             </div>
@@ -347,10 +359,11 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
                 </div>
               )}
             </div>
-            <div className="p-3 border-t text-center">
+            <div className="p-3 border-t text-center bg-theme-50 dark:bg-theme-900">
               <Link 
                 href="/dashboard/notifications" 
-                className="text-xs text-theme hover:underline"
+                className="text-xs text-theme hover:text-theme-600 hover:underline"
+                onClick={() => setIsNotificationOpen(false)}
               >
                 View all notifications
               </Link>

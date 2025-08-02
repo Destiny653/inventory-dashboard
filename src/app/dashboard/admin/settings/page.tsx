@@ -302,37 +302,52 @@ export default function AdminSettingsPage() {
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <div className="border rounded-lg">
+                  <div className="border rounded-lg overflow-hidden shadow-sm">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead>Last Sign In</TableHead>
-                          <TableHead>Actions</TableHead>
+                      <TableHeader className="bg-theme-50 dark:bg-theme-900">
+                        <TableRow className="border-b border-theme-200 dark:border-theme-800">
+                          <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Name</TableHead>
+                          <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Email</TableHead>
+                          <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Role</TableHead>
+                          <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Created</TableHead>
+                          <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Last Sign In</TableHead>
+                          <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>
-                              {user.full_name || 'N/A'}
+                        {users.map((user, index) => (
+                          <TableRow 
+                            key={user.id} 
+                            className={`border-b border-theme-100 dark:border-theme-800 hover:bg-theme-50 dark:hover:bg-theme-900/50 transition-all duration-200 ${
+                              index % 2 === 0 ? 'bg-white dark:bg-theme-950' : 'bg-theme-50 dark:bg-theme-900/50'
+                            }`}
+                          >
+                            <TableCell className="font-medium text-theme-900 dark:text-theme-100">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 rounded-full bg-theme-primary flex items-center justify-center text-white text-sm font-semibold">
+                                  {user.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                                </div>
+                                <span>{user.full_name || 'N/A'}</span>
+                              </div>
                             </TableCell>
-                            <TableCell>{user.email}</TableCell>
+                            <TableCell className="text-theme-600 dark:text-theme-300">
+                              {user.email}
+                            </TableCell>
                             <TableCell>
-                              <Badge variant={getRoleBadgeVariant(user.role)}>
+                              <Badge 
+                                variant={getRoleBadgeVariant(user.role)} 
+                                className="px-3 py-1 text-xs font-medium"
+                              >
                                 {user.role || 'user'}
                               </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-theme-600 dark:text-theme-300">
                               {new Date(user.created_at).toLocaleDateString()}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-theme-600 dark:text-theme-300">
                               {user.last_sign_in_at 
                                 ? new Date(user.last_sign_in_at).toLocaleDateString()
-                                : 'Never'
+                                : <span className="text-theme-400 dark:text-theme-500">Never</span>
                               }
                             </TableCell>
                             <TableCell>
@@ -340,6 +355,7 @@ export default function AdminSettingsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleAssignRole(user)}
+                                className="bg-theme-primary text-white border-0 hover:bg-theme-primary-hover transition-all duration-200 shadow-sm"
                               >
                                 <Edit className="h-4 w-4 mr-1" />
                                 Edit Role
@@ -667,17 +683,17 @@ export default function AdminSettingsPage() {
           
           <div className="py-6 space-y-6">
             {/* User Info */}
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-semibold text-lg">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-semibold text-lg">
                     {selectedUser?.full_name?.charAt(0) || 'U'}
                   </span>
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{selectedUser?.full_name}</p>
-                  <p className="text-sm text-gray-600">{selectedUser?.email}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{selectedUser?.full_name}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedUser?.email}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
                     Created: {selectedUser?.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
@@ -764,7 +780,7 @@ export default function AdminSettingsPage() {
             <Button 
               onClick={handleRoleUpdate}
               disabled={!selectedRole || isUpdatingRole || selectedRole === selectedUser?.role}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
             >
               {isUpdatingRole ? (
                 <>
