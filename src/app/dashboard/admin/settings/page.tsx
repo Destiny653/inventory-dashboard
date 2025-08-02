@@ -51,12 +51,11 @@ import { Loader2, UserPlus, Edit, Trash2 } from 'lucide-react'
 interface User {
   id: string
   email: string
+  full_name?: string
+  phone?: string
   created_at: string
-  raw_user_meta_data: {
-    full_name?: string
-    role?: string
-    [key: string]: any
-  }
+  role?: string
+  avatar_url?: string
   last_sign_in_at?: string
 }
 
@@ -101,18 +100,28 @@ export default function AdminSettingsPage() {
   const fetchUsers = async () => {
     setIsLoadingUsers(true)
     try {
-      const { data, error } = await supabase
-        .from('auth.users')
-        .select('id, email, created_at, raw_user_meta_data, last_sign_in_at')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching users:', error)
+      // Get all auth users with their metadata
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
+      
+      if (authError) {
+        console.error('Error fetching auth users:', authError)
         toast.error('Failed to fetch users')
         return
       }
 
-      setUsers(data || [])
+      // Convert auth users to our User format
+      const usersWithRoles: User[] = authUsers.users.map(authUser => ({
+        id: authUser.id,
+        email: authUser.email || '',
+        full_name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'N/A',
+        phone: authUser.phone || 'N/A',
+        created_at: authUser.created_at,
+        role: authUser.user_metadata?.role || 'user',
+        avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture,
+        last_sign_in_at: authUser.last_sign_in_at || undefined
+      }))
+
+      setUsers(usersWithRoles)
     } catch (error) {
       console.error('Error fetching users:', error)
       toast.error('Failed to fetch users')
@@ -121,15 +130,30 @@ export default function AdminSettingsPage() {
     }
   }
 
-  // Update user role
+  // Update user role using Supabase Auth Admin API
   const updateUserRole = async (userId: string, email: string, role: string, fullName?: string) => {
     setIsUpdatingRole(true)
     try {
-      const { error } = await supabase.rpc('update_user_role', {
-        user_id: userId,
-        user_email: email,
-        new_role: role,
-        user_full_name: fullName || 'User'
+      // Get current user metadata
+      const { data: currentUser, error: fetchError } = await supabase.auth.admin.getUserById(userId)
+      
+      if (fetchError) {
+        console.error('Error fetching user:', fetchError)
+        toast.error('Failed to fetch user data')
+        return
+      }
+
+      // Prepare updated metadata
+      const currentMetadata = currentUser.user.user_metadata || {}
+      const updatedMetadata = {
+        ...currentMetadata,
+        role: role,
+        full_name: fullName || currentMetadata.full_name || currentMetadata.name || 'User'
+      }
+
+      // Update user metadata with new role
+      const { error } = await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: updatedMetadata
       })
 
       if (error) {
@@ -154,7 +178,7 @@ export default function AdminSettingsPage() {
   // Handle role assignment
   const handleAssignRole = (user: User) => {
     setSelectedUser(user)
-    setSelectedRole(user.raw_user_meta_data?.role || '')
+    setSelectedRole(user.role || 'user')
     setIsRoleDialogOpen(true)
   }
 
@@ -166,7 +190,7 @@ export default function AdminSettingsPage() {
       selectedUser.id,
       selectedUser.email,
       selectedRole,
-      selectedUser.raw_user_meta_data?.full_name
+      selectedUser.full_name
     )
   }
 
@@ -177,8 +201,10 @@ export default function AdminSettingsPage() {
         return 'destructive'
       case 'vendor':
         return 'default'
-      default:
+      case 'customer':
         return 'secondary'
+      default:
+        return 'outline'
     }
   }
 
@@ -280,12 +306,12 @@ export default function AdminSettingsPage() {
                         {users.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell>
-                              {user.raw_user_meta_data?.full_name || 'N/A'}
+                              {user.full_name || 'N/A'}
                             </TableCell>
                             <TableCell>{user.email}</TableCell>
                             <TableCell>
-                              <Badge variant={getRoleBadgeVariant(user.raw_user_meta_data?.role)}>
-                                {user.raw_user_meta_data?.role || 'user'}
+                              <Badge variant={getRoleBadgeVariant(user.role)}>
+                                {user.role || 'user'}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -617,45 +643,116 @@ export default function AdminSettingsPage() {
 
       {/* Role Assignment Dialog */}
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign User Role</DialogTitle>
-            <DialogDescription>
-              Select a role for {selectedUser?.email}
+        <DialogContent className="bg-white sm:max-w-[500px] border-0 shadow-lg">
+          <DialogHeader className="pb-4 border-b border-gray-200">
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              Assign User Role
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Update the role and permissions for this user
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Current Role</Label>
-              <Badge variant={getRoleBadgeVariant(selectedUser?.raw_user_meta_data?.role)}>
-                {selectedUser?.raw_user_meta_data?.role || 'user'}
-              </Badge>
+          
+          <div className="py-6 space-y-6">
+            {/* User Info */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-semibold text-lg">
+                    {selectedUser?.full_name?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{selectedUser?.full_name}</p>
+                  <p className="text-sm text-gray-600">{selectedUser?.email}</p>
+                  <p className="text-xs text-gray-500">
+                    Created: {selectedUser?.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">New Role</Label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="vendor">Vendor</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
+
+            {/* Role Information */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Current Role</Label>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={getRoleBadgeVariant(selectedUser?.role)} className="px-3 py-1">
+                    {selectedUser?.role || 'user'}
+                  </Badge>
+                  <span className="text-sm text-gray-500">
+                    {selectedUser?.role === 'admin' && 'Full administrative access'}
+                    {selectedUser?.role === 'vendor' && 'Can manage products and orders'}
+                    {selectedUser?.role === 'customer' && 'Can place orders and view history'}
+                    {selectedUser?.role === 'user' && 'Basic user access'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="role" className="text-sm font-medium text-gray-700">
+                  New Role
+                </Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectValue placeholder="Select a new role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user" className="py-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <div>
+                          <p className="font-medium">User</p>
+                          <p className="text-xs text-gray-500">Basic access</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="customer" className="py-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <div>
+                          <p className="font-medium">Customer</p>
+                          <p className="text-xs text-gray-500">Can place orders</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="vendor" className="py-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <div>
+                          <p className="font-medium">Vendor</p>
+                          <p className="text-xs text-gray-500">Can manage products</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin" className="py-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                        <div>
+                          <p className="font-medium">Admin</p>
+                          <p className="text-xs text-gray-500">Full access</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          
+          <DialogFooter className="pt-4 border-t border-gray-200">
             <Button 
               variant="outline" 
               onClick={() => setIsRoleDialogOpen(false)}
               disabled={isUpdatingRole}
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleRoleUpdate}
-              disabled={!selectedRole || isUpdatingRole}
+              disabled={!selectedRole || isUpdatingRole || selectedRole === selectedUser?.role}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isUpdatingRole ? (
                 <>
@@ -663,7 +760,10 @@ export default function AdminSettingsPage() {
                   Updating...
                 </>
               ) : (
-                'Update Role'
+                <>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Update Role
+                </>
               )}
             </Button>
           </DialogFooter>

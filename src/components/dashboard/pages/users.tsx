@@ -36,6 +36,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -185,60 +187,99 @@ export function UsersPage() {
             <MessageSquare className="h-4 w-4" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="bg-white sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Send Message to {user.full_name}</DialogTitle>
+        <DialogContent className="bg-white sm:max-w-[600px] border-0 shadow-lg">
+          <DialogHeader className="pb-4 border-b border-gray-200">
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              Send Message to {selectedUser?.full_name}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Send a personalized message to {selectedUser?.email}
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="subject" className="text-right">
-                Subject
-              </Label>
-              <Input
-                id="subject"
-                value={emailContent.subject}
-                onChange={(e) => setEmailContent({
-                  ...emailContent,
-                  subject: e.target.value
-                })}
-                className="col-span-3"
-                placeholder="Message subject"
-              />
+          
+          <div className="py-6 space-y-6">
+            {/* Recipient Info */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-semibold text-sm">
+                    {selectedUser?.full_name?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">{selectedUser?.full_name}</p>
+                  <p className="text-sm text-gray-600">{selectedUser?.email}</p>
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="message" className="text-right">
-                Message
-              </Label>
-              <Textarea
-                id="message"
-                value={emailContent.message}
-                onChange={(e) => setEmailContent({
-                  ...emailContent,
-                  message: e.target.value
-                })}
-                className="col-span-3"
-                rows={6}
-                placeholder="Write your message here..."
-              />
+
+            {/* Message Form */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="subject" className="text-sm font-medium text-gray-700">
+                  Subject
+                </Label>
+                <Input
+                  id="subject"
+                  value={emailContent.subject}
+                  onChange={(e) => setEmailContent({
+                    ...emailContent,
+                    subject: e.target.value
+                  })}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Enter message subject..."
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="message" className="text-sm font-medium text-gray-700">
+                  Message
+                </Label>
+                <Textarea
+                  id="message"
+                  value={emailContent.message}
+                  onChange={(e) => setEmailContent({
+                    ...emailContent,
+                    message: e.target.value
+                  })}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 min-h-[120px]"
+                  rows={6}
+                  placeholder="Write your message here..."
+                />
+                <p className="text-xs text-gray-500">
+                  Your message will be sent with a professional email template.
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          
+          <DialogFooter className="pt-4 border-t border-gray-200">
             <Button 
               variant="outline" 
               onClick={() => setMessageDialogOpen(false)}
+              disabled={sendingEmail}
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSendEmail}
-              disabled={sendingEmail || !emailContent.message}
+              disabled={!emailContent.subject.trim() || !emailContent.message.trim() || sendingEmail}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {sendingEmail ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Send Message
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Send Message
+                </>
+              )}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

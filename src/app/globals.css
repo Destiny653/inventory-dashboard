@@ -115,7 +115,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%; /* Added ring definition */
-    --radius: 0.5rem;
+    --radius: 0rem;
     --theme-50: #f8fafc;
     --theme-100: #f1f5f9;
     --theme-200: #e2e8f0;
@@ -473,3 +473,236 @@
     @apply border-[hsl(var(--theme-900))];
   }
 } */
+
+/* Global overrides to remove border radius and box shadows from shadcn components */
+@layer base {
+  /* Remove border radius from all shadcn components */
+  .card,
+  .card-header,
+  .card-content,
+  .card-footer,
+  .button,
+  .input,
+  .textarea,
+  .select,
+  .select-trigger,
+  .select-content,
+  .select-item,
+  .dialog,
+  .dialog-content,
+  .dialog-header,
+  .dialog-footer,
+  .popover,
+  .popover-content,
+  .tooltip,
+  .tooltip-content,
+  .dropdown-menu,
+  .dropdown-menu-content,
+  .dropdown-menu-item,
+  .dropdown-menu-sub,
+  .dropdown-menu-sub-content,
+  .dropdown-menu-sub-trigger,
+  .dropdown-menu-separator,
+  .context-menu,
+  .context-menu-content,
+  .context-menu-item,
+  .context-menu-sub,
+  .context-menu-sub-content,
+  .context-menu-sub-trigger,
+  .context-menu-separator,
+  .navigation-menu,
+  .navigation-menu-list,
+  .navigation-menu-item,
+  .navigation-menu-trigger,
+  .navigation-menu-content,
+  .navigation-menu-link,
+  .navigation-menu-viewport,
+  .navigation-menu-indicator,
+  .tabs,
+  .tabs-list,
+  .tabs-trigger,
+  .tabs-content,
+  .accordion,
+  .accordion-item,
+  .accordion-trigger,
+  .accordion-content,
+  .alert,
+  .alert-dialog,
+  .alert-dialog-content,
+  .alert-dialog-header,
+  .alert-dialog-footer,
+  .badge,
+  .breadcrumb,
+  .breadcrumb-list,
+  .breadcrumb-item,
+  .breadcrumb-link,
+  .breadcrumb-separator,
+  .calendar,
+  .calendar-grid,
+  .calendar-cell,
+  .calendar-day,
+  .calendar-month,
+  .calendar-year,
+  .calendar-decade,
+  .command,
+  .command-input,
+  .command-list,
+  .command-item,
+  .command-group,
+  .command-separator,
+  .command-shortcut,
+  .command-dialog,
+  .command-dialog-content,
+  .hover-card,
+  .hover-card-trigger,
+  .hover-card-content,
+  .menubar,
+  .menubar-trigger,
+  .menubar-content,
+  .menubar-item,
+  .menubar-sub,
+  .menubar-sub-content,
+  .menubar-sub-trigger,
+  .menubar-separator,
+  .menubar-shortcut,
+  .menubar-checkbox-item,
+  .menubar-radio-group,
+  .menubar-radio-item,
+  .progress,
+  .progress-indicator,
+  .radio-group,
+  .radio-group-item,
+  .radio-group-indicator,
+  .scroll-area,
+  .scroll-area-viewport,
+  .scroll-area-scrollbar,
+  .scroll-area-thumb,
+  .scroll-area-corner,
+  .separator,
+  .sheet,
+  .sheet-trigger,
+  .sheet-content,
+  .sheet-header,
+  .sheet-footer,
+  .sheet-title,
+  .sheet-description,
+  .skeleton,
+  .slider,
+  .slider-track,
+  .slider-range,
+  .slider-thumb,
+  .switch,
+  .switch-thumb,
+  .switch-track,
+  .table,
+  .table-header,
+  .table-body,
+  .table-footer,
+  .table-row,
+  .table-head,
+  .table-cell,
+  .table-caption,
+  .toast,
+  .toast-viewport,
+  .toast-action,
+  .toast-close,
+  .toggle,
+  .toggle-group,
+  .toggle-group-item,
+  .toggle-group-trigger,
+  .toggle-group-content,
+  .toggle-group-separator,
+  .tooltip,
+  .tooltip-trigger,
+  .tooltip-content,
+  .tooltip-arrow,
+  .tooltip-provider {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Remove box shadows from specific components that might have them */
+  .card,
+  .dialog-content,
+  .popover-content,
+  .dropdown-menu-content,
+  .context-menu-content,
+  .navigation-menu-content,
+  .alert-dialog-content,
+  .command-dialog-content,
+  .hover-card-content,
+  .menubar-content,
+  .sheet-content,
+  .toast {
+    box-shadow: none !important;
+  }
+
+  /* Remove focus rings and shadows from form elements */
+  .input:focus,
+  .textarea:focus,
+  .select-trigger:focus,
+  .button:focus {
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Remove border radius from buttons */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-destructive,
+  .btn-outline,
+  .btn-ghost,
+  .btn-link {
+    border-radius: 0 !important;
+  }
+
+  /* Remove border radius from inputs */
+  .input,
+  .textarea,
+  .select-trigger {
+    border-radius: 0 !important;
+  }
+
+  /* Remove border radius from cards */
+  .card,
+  .card-header,
+  .card-content,
+  .card-footer {
+    border-radius: 0 !important;
+  }
+
+  /* Remove border radius from dialogs */
+  .dialog,
+  .dialog-content,
+  .dialog-header,
+  .dialog-footer {
+    border-radius: 0 !important;
+  }
+
+  /* Remove border radius from badges */
+  .badge {
+    border-radius: 0 !important;
+  }
+
+  /* Remove border radius from toasts */
+  .toast {
+    border-radius: 0 !important;
+  }
+}
+
+/* Utility class for explicit no-border-radius and no-shadow */
+@layer utilities {
+  .no-radius {
+    border-radius: 0 !important;
+  }
+  
+  .no-shadow {
+    box-shadow: none !important;
+  }
+  
+  .flat {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
