@@ -19,10 +19,29 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { DollarSign, ShoppingCart, TrendingUp, Loader2, AlertCircle, Package } from 'lucide-react'
+import { DollarSign, ShoppingCart, TrendingUp, Loader2, AlertCircle, Package, ArrowUpRight, Users, CreditCard } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 
-// Type definitions
+// Unified color palette for consistency
+const COLORS = {
+  primary: '#3B82F6', // Blue
+  secondary: '#8B5CF6', // Purple
+  success: '#10B981', // Emerald
+  warning: '#F59E0B', // Amber
+  danger: '#EF4444', // Red
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  background: '#F9FAFB',
+  cardBg: '#FFFFFF',
+  cardBorder: '#E5E7EB',
+  chartGrid: '#E5E7EB'
+}
+
+// Chart colors array
+const CHART_COLORS = [COLORS.primary, COLORS.secondary, COLORS.success, COLORS.warning, COLORS.danger, '#6366f1', '#8b5cf6']
+
 interface SalesData {
   month: string;
   sales: number;
@@ -38,48 +57,37 @@ interface ProductData {
   sales: number;
 }
 
-// Color scheme for a sleek, modern look
-const CHART_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6'];
-
-// A central place for all colors to ensure consistency
-const THEME_COLORS = {
-  cardBg:'#6366f1',
-  primary: '#6366f1',
-  primaryMuted: '#eef2ff',
-  primaryHover: '#4f46e5',
-  secondary: '#a855f7',
-  secondaryMuted: '#f3e8ff',
-  success: '#10b981',
-  successMuted: '#d1fae5',
-  warning: '#f59e0b',
-  warningMuted: '#fffbeb',
-  danger: '#ef4444',
-  dangerMuted: '#fee2e2',
-  text: '#1f2937',
-  textMuted: '#6b7280',
-  border: '#e5e7eb',
-  background: '#f9fafb',
-};
-
-// A beautiful, custom tooltip component for the charts
+// Custom tooltip component for charts
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const value = payload[0].value.toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-
     return (
-      <div className="rounded-lg border bg-white p-2 text-sm shadow-md">
-        <p className="font-semibold">{label}</p>
-        <p className="text-gray-500">{`Sales: ${value}`}</p>
+      <div className="rounded-lg border bg-white p-4 text-sm shadow-md">
+        <p className="font-semibold text-gray-900">{label}</p>
+        <div className="mt-1 space-y-1">
+          {payload.map((item: any, index: number) => (
+            <div key={index} className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div 
+                  className="mr-2 h-3 w-3 rounded-full" 
+                  style={{ backgroundColor: item.color || CHART_COLORS[index % CHART_COLORS.length] }}
+                />
+                <span className="text-gray-600">{item.name}</span>
+              </div>
+              <span className="font-medium text-gray-900">
+                {typeof item.value === 'number' 
+                  ? item.name === 'sales' || item.name === 'Revenue'
+                    ? `$${item.value.toLocaleString()}`
+                    : item.value.toLocaleString()
+                  : item.value}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
-    );
+    )
   }
-  return null;
-};
+  return null
+}
 
 export default function AnalyticsPage() {
   const [salesData, setSalesData] = useState<SalesData[]>([])
@@ -90,7 +98,9 @@ export default function AnalyticsPage() {
     totalOrders: 0,
     avgOrderValue: 0,
     growthRate: 0,
-    topCategoryName: 'N/A'
+    topCategoryName: 'N/A',
+    activeCustomers: 0,
+    refunds: 0
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -116,7 +126,9 @@ export default function AnalyticsPage() {
       const [
         ordersResponse,
         categoriesResponse,
-        previousMonthData
+        previousMonthData,
+        customersResponse,
+        refundsResponse
       ] = await Promise.all([
         supabase.from('orders').select('*, order_items(price, quantity, products(name, categories(id, name)))'),
         supabase.from('categories').select('*'),
@@ -124,20 +136,34 @@ export default function AnalyticsPage() {
           .from('orders')
           .select('total_amount')
           .lt('created_at', new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString())
-          .gte('created_at', new Date(new Date().setMonth(new Date().getMonth() - 2)).toISOString())
+          .gte('created_at', new Date(new Date().setMonth(new Date().getMonth() - 2)).toISOString()),
+        supabase
+          .from('customers')
+          .select('id', { count: 'exact' })
+          .eq('status', 'active'),
+        supabase
+          .from('orders')
+          .select('id', { count: 'exact' })
+          .eq('status', 'refunded')
       ])
 
-      const ordersError = ordersResponse.error
-      const categoriesError = categoriesResponse.error
-      const previousMonthError = previousMonthData.error
+      const errors = [
+        ordersResponse.error,
+        categoriesResponse.error,
+        previousMonthData.error,
+        customersResponse.error,
+        refundsResponse.error
+      ].filter(Boolean)
 
-      if (ordersError || categoriesError || previousMonthError) {
-        throw ordersError || categoriesError || previousMonthError
+      if (errors.length > 0) {
+        throw errors[0]
       }
 
       const orders = ordersResponse.data || []
       const categories = categoriesResponse.data || []
       const previousMonthOrders = previousMonthData.data || []
+      const activeCustomers = customersResponse.count || 0
+      const refunds = refundsResponse.count || 0
 
       // Calculate stats
       const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
@@ -162,7 +188,7 @@ export default function AnalyticsPage() {
       const topSellingProducts = generateTopProducts(orders)
       setTopProducts(topSellingProducts)
 
-      const topCategory = categoryDistribution.length > 0 ? categoryDistribution[0] : { name: 'N/A', value: 0 };
+      const topCategory = categoryDistribution.length > 0 ? categoryDistribution[0] : { name: 'N/A', value: 0 }
 
       setStats({
         totalRevenue,
@@ -170,11 +196,16 @@ export default function AnalyticsPage() {
         avgOrderValue,
         growthRate: parseFloat(growthRate.toFixed(1)),
         topCategoryName: topCategory.name,
+        activeCustomers,
+        refunds
       })
+
+      toast.success('Analytics data loaded successfully!')
 
     } catch (error) {
       console.error('Error fetching analytics data:', error)
       setError('Failed to load analytics data. Please try again.')
+      toast.error('Failed to load analytics data.')
     } finally {
       setLoading(false)
     }
@@ -194,7 +225,7 @@ export default function AnalyticsPage() {
       salesByMonth[month] = (salesByMonth[month] || 0) + (order.total_amount || 0)
     })
 
-    const currentMonth = new Date().getMonth();
+    const currentMonth = new Date().getMonth()
     return months.map((month, index) => ({
       month,
       sales: salesByMonth[month]
@@ -202,22 +233,22 @@ export default function AnalyticsPage() {
   }
 
   function generateCategoryDistribution(orders: any[], categories: any[]): CategoryData[] {
-    const categorySales = new Map<string, number>();
+    const categorySales = new Map<string, number>()
 
     categories.forEach(category => {
-      categorySales.set(category.id, 0);
-    });
+      categorySales.set(category.id, 0)
+    })
   
     for (const order of orders) {
-      if (!order.order_items || !Array.isArray(order.order_items)) continue;
+      if (!order.order_items || !Array.isArray(order.order_items)) continue
   
       for (const item of order.order_items) {
         if (item.products?.categories?.id) {
-          const categoryId = item.products.categories.id;
-          const saleAmount = (item.price || 0) * (item.quantity || 0);
+          const categoryId = item.products.categories.id
+          const saleAmount = (item.price || 0) * (item.quantity || 0)
   
           if (categorySales.has(categoryId)) {
-            categorySales.set(categoryId, categorySales.get(categoryId)! + saleAmount);
+            categorySales.set(categoryId, categorySales.get(categoryId)! + saleAmount)
           }
         }
       }
@@ -229,7 +260,7 @@ export default function AnalyticsPage() {
         value
       }))
       .filter(item => item.value > 0)
-      .sort((a, b) => b.value - a.value);
+      .sort((a, b) => b.value - a.value)
   }
 
   function generateTopProducts(orders: any[]): ProductData[] {
@@ -258,16 +289,16 @@ export default function AnalyticsPage() {
   }
 
   const renderPieLabel = ({ name, percent }: { name: string; percent: number }) => {
-    if (windowWidth < 768) return null;
-    return `${name} (${(percent * 100).toFixed(0)}%)`;
-  };
+    if (windowWidth < 768) return null
+    return `${name} (${(percent * 100).toFixed(0)}%)`
+  }
 
   const getProductName = (name: string): string => {
     if (windowWidth < 640) {
-      return name.length > 10 ? `${name.substring(0, 8)}...` : name;
+      return name.length > 10 ? `${name.substring(0, 8)}...` : name
     }
-    return name;
-  };
+    return name
+  }
 
   if (loading) {
     return (
@@ -298,35 +329,37 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-muted/30 p-4 lg:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Sales Analytics</h1>
-            <p className="text-gray-500">A detailed look into your business performance</p>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Sales Analytics</h1>
+            <p className="text-muted-foreground">A detailed look into your business performance</p>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg rounded-xl">
+          <Card className="bg-blue-50 border-blue-100 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Total Revenue</CardTitle>
-              <DollarSign className="h-5 w-5 text-indigo-500" />
+              <CardTitle className="text-sm font-medium text-blue-800">Total Revenue</CardTitle>
+              <div className="p-2 rounded-full bg-blue-100">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-blue-900">
                 ${stats.totalRevenue.toLocaleString()}
               </div>
-              <p className="text-xs text-gray-500 flex items-center mt-2">
+              <p className="text-xs text-blue-700 flex items-center mt-1">
                 {stats.growthRate >= 0 ? (
                   <>
-                    <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                    <span className="text-green-500 font-medium">+{stats.growthRate}%</span> from last month
+                    <ArrowUpRight className="mr-1 h-3 w-3 text-emerald-600" />
+                    <span className="text-emerald-600 font-medium">+{stats.growthRate}%</span> from last month
                   </>
                 ) : (
                   <>
-                    <TrendingUp className="mr-1 h-4 w-4 text-red-500 transform rotate-180" />
+                    <ArrowUpRight className="mr-1 h-3 w-3 text-red-500 transform rotate-180" />
                     <span className="text-red-500 font-medium">{stats.growthRate}%</span> from last month
                   </>
                 )}
@@ -334,132 +367,179 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
 
-          <Card className="transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg rounded-xl">
+          <Card className="bg-purple-50 border-purple-100 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Total Orders</CardTitle>
-              <ShoppingCart className="h-5 w-5 text-purple-500" />
+              <CardTitle className="text-sm font-medium text-purple-800">Total Orders</CardTitle>
+              <div className="p-2 rounded-full bg-purple-100">
+                <ShoppingCart className="h-4 w-4 text-purple-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{stats.totalOrders}</div>
-              <p className="text-xs text-gray-500 mt-2">
+              <div className="text-2xl font-bold text-purple-900">{stats.totalOrders}</div>
+              <p className="text-xs text-purple-700 mt-1">
                 Avg. order: ${stats.avgOrderValue.toFixed(2)}
               </p>
             </CardContent>
           </Card>
           
-          <Card className="transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg rounded-xl">
+          <Card className="bg-emerald-50 border-emerald-100 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Top Category</CardTitle>
-              <Package className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-sm font-medium text-emerald-800">Active Customers</CardTitle>
+              <div className="p-2 rounded-full bg-emerald-100">
+                <Users className="h-4 w-4 text-emerald-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-gray-900">
-                {stats.topCategoryName}
+              <div className="text-2xl font-bold text-emerald-900">
+                {stats.activeCustomers}
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                <Badge variant="secondary" className="bg-amber-100 text-amber-700">
-                  ${categoryData.length > 0 ? categoryData[0].value.toLocaleString() : 0} in sales
+              <p className="text-xs text-emerald-700 mt-1">
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                  {Math.round((stats.activeCustomers / stats.totalOrders) * 100)}% repeat rate
                 </Badge>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-rose-50 border-rose-100 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-rose-800">Refunds</CardTitle>
+              <div className="p-2 rounded-full bg-rose-100">
+                <CreditCard className="h-4 w-4 text-rose-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-rose-900">{stats.refunds}</div>
+              <p className="text-xs text-rose-700 mt-1">
+                {stats.totalOrders > 0 ? 
+                  `${((stats.refunds / stats.totalOrders) * 100).toFixed(1)}% of orders` : 
+                  'No orders yet'}
               </p>
             </CardContent>
           </Card>
         </div>
 
+        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Card className="h-full rounded-xl transform transition-all duration-300 hover:scale-[1.01] hover:shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold text-gray-900">Monthly Sales Trends</CardTitle>
-                <p className="text-sm text-gray-500">Revenue performance over the year</p>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={THEME_COLORS.border} />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fill: THEME_COLORS.textMuted, fontSize: 12 }}
-                        axisLine={{ stroke: THEME_COLORS.border }}
-                      />
-                      <YAxis
-                        tick={{ fill: THEME_COLORS.textMuted, fontSize: 12 }}
-                        axisLine={{ stroke: THEME_COLORS.border }}
-                        tickFormatter={(value) => `$${value.toLocaleString()}`}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Line
-                        type="monotone"
-                        dataKey="sales"
-                        stroke={THEME_COLORS.primary}
-                        strokeWidth={2}
-                        dot={{ fill: THEME_COLORS.primary, r: 4 }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+          {/* Revenue Trend */}
+          <Card className="lg:col-span-2 border shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-foreground">Monthly Revenue Trend</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">Performance over the current year</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="p-2 rounded-full bg-blue-50">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={salesData}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chartGrid} vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fill: COLORS.textSecondary, fontSize: 12 }}
+                      tickMargin={10}
+                      stroke={COLORS.cardBorder}
+                    />
+                    <YAxis
+                      tick={{ fill: COLORS.textSecondary, fontSize: 12 }}
+                      stroke={COLORS.cardBorder}
+                      tickFormatter={(value) => `$${value.toLocaleString()}`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line
+                      type="monotone"
+                      dataKey="sales"
+                      stroke={COLORS.primary}
+                      strokeWidth={2}
+                      dot={{ fill: COLORS.primary, r: 4 }}
+                      activeDot={{ r: 6, fill: COLORS.primary }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
           
-          <div>
-            <Card className="h-full rounded-xl transform transition-all duration-300 hover:scale-[1.01] hover:shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold text-gray-900">Sales by Category</CardTitle>
-                <p className="text-sm text-gray-500">Distribution of sales across categories</p>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={renderPieLabel}
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={CHART_COLORS[index % CHART_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: THEME_COLORS.cardBg,
-                          borderColor: THEME_COLORS.border,
-                          borderRadius: '0.5rem',
-                          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-                        }}
-                        formatter={(value: number, name: string, props) => [`$${value.toLocaleString()}`, props.payload.name]}
-                      />
-                      <Legend
-                        verticalAlign="bottom"
-                        align="center"
-                        wrapperStyle={{ marginTop: '20px' }}
-                        formatter={(value, entry) => (
-                          <span className="text-sm text-gray-600">{value}</span>
-                        )}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+          {/* Sales Distribution */}
+          <Card className="border shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-foreground">Sales by Category</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">Revenue distribution across categories</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="p-2 rounded-full bg-purple-50">
+                  <Package className="h-4 w-4 text-purple-600" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={renderPieLabel}
+                      labelLine={false}
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={<CustomTooltip />}
+                      formatter={(value: number, name: string, props) => [
+                        `$${value.toLocaleString()}`,
+                        props.payload.name
+                      ]}
+                    />
+                    <Legend
+                      layout="vertical"
+                      verticalAlign="middle"
+                      align="right"
+                      wrapperStyle={{ paddingLeft: '20px' }}
+                      formatter={(value, entry) => (
+                        <span className="text-sm text-gray-600">{value}</span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Top Selling Products Bar Chart */}
-        <Card className="rounded-xl transform transition-all duration-300 hover:scale-[1.01] hover:shadow-lg">
+        <Card className="border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-gray-900">Top Selling Products</CardTitle>
-            <p className="text-sm text-gray-500">Top 10 products by sales volume</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-foreground">Top Selling Products</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Top 10 products by revenue</p>
+              </div>
+              <div className="p-2 rounded-full bg-emerald-50">
+                <ShoppingCart className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[400px]">
@@ -474,24 +554,28 @@ export default function AnalyticsPage() {
                     bottom: 10,
                   }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke={THEME_COLORS.border} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chartGrid} horizontal={true} vertical={false} />
                   <XAxis
                     type="number"
-                    tick={{ fill: THEME_COLORS.textMuted, fontSize: 12 }}
-                    axisLine={{ stroke: THEME_COLORS.border }}
+                    tick={{ fill: COLORS.textSecondary, fontSize: 12 }}
+                    axisLine={{ stroke: COLORS.cardBorder }}
                     tickFormatter={(value) => `$${value.toLocaleString()}`}
                   />
                   <YAxis
                     dataKey="name"
                     type="category"
-                    tick={{ fill: THEME_COLORS.textMuted, fontSize: 12 }}
-                    axisLine={{ stroke: THEME_COLORS.border }}
+                    tick={{ fill: COLORS.textSecondary, fontSize: 12 }}
+                    axisLine={{ stroke: COLORS.cardBorder }}
                     width={100}
+                    tickFormatter={getProductName}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip 
+                    content={<CustomTooltip />}
+                    formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                  />
                   <Bar
                     dataKey="sales"
-                    fill={THEME_COLORS.primary}
+                    fill={COLORS.primary}
                     radius={[0, 4, 4, 0]}
                     barSize={20}
                   />
