@@ -417,7 +417,7 @@ export default function AdminVendorsPage() {
                                                     size="sm"
                                                     onClick={() => viewVendorSales(vendor)}
                                                 >
-                                                    {formatCurrency(vendor.total_sales || 0)}
+                                                    {formatCurrency(vendorSales.reduce((sum, sale) => sum + sale.total, 0))}
                                                 </Button>
                                             </TableCell>
                                             <TableCell className="text-right">

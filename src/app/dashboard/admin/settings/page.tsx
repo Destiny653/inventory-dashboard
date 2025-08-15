@@ -265,7 +265,6 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-2xl font-bold">Admin Settings</h1>
       
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full grid-cols-5">

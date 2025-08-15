@@ -29,7 +29,6 @@ const vendorLinks = [
   { name: 'Customers', href: '/dashboard/users', icon: Users },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { name: 'Stock Alerts', href: '/dashboard/stock-alerts', icon: AlertTriangle },
   { name: 'Payouts', href: '/dashboard/payouts', icon: CreditCard },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
@@ -40,6 +39,7 @@ const adminLinks = [
   { name: 'Products', href: '/dashboard/admin/products', icon: Package },
   { name: 'Orders', href: '/dashboard/admin/orders', icon: ShoppingCart },
   { name: 'Customers', href: '/dashboard/admin/customers', icon: Users },
+  { name: 'Stock Alerts', href: '/dashboard/admin/stock-alerts', icon: AlertTriangle },
   { name: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
 ]
@@ -183,11 +183,6 @@ export function Sidebar({ className }: { className?: string }) {
                 <>
                   {link.name}
                   {/* Optional: Add indicator for items needing attention */}
-                  {link.name === 'Stock Alerts' && (
-                    <span className="ml-auto h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-                      3
-                    </span>
-                  )}
                 </>
               )}
             </Link>

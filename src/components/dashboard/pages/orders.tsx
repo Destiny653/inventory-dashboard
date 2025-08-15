@@ -424,10 +424,7 @@ export function OrdersPage() {
         <h1 className="text-2xl font-bold">Order Management</h1>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href="/dashboard/sales/completed">View Completed Orders</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/orders/create">Create Order</Link>
+            <Link href="/dashboard/admin/sales/completed-orders">View Completed Orders</Link>
           </Button>
         </div>
       </div>

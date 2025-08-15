@@ -191,15 +191,15 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
   function getNotificationLink(notification: Notification): string {
     switch (notification.type) {
       case 'order':
-        return `/dashboard/orders/${notification.metadata?.order_id || ''}`
+        return `/dashboard/admin/orders/${notification.metadata?.order_id || ''}`
       case 'payment':
-        return `/dashboard/payments/${notification.metadata?.payment_id || ''}`
+        return `/dashboard/admin/payments/${notification.metadata?.payment_id || ''}`
       case 'stock':
-        return `/dashboard/products/${notification.metadata?.product_id || ''}`
+        return `/dashboard/admin/products/${notification.metadata?.product_id || ''}`
       case 'status_update':
-        return `/dashboard/orders/${notification.metadata?.order_id || ''}`
+        return `/dashboard/admin/orders/${notification.metadata?.order_id || ''}`
       default:
-        return '/dashboard/notifications'
+        return '/dashboard/admin/notifications'
     }
   }
 
@@ -282,7 +282,7 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
             </Button>
           </PopoverTrigger>
           <PopoverContent 
-            className="w-[calc(100vw-20px)] sm:w-80 p-0" 
+            className="w-[calc(100vw-20px)] sm:w-80 p-0 bg-white" 
             align="end"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
@@ -361,7 +361,7 @@ export function Header({ user }: { user: { id: string; name?: string | null; ema
             </div>
             <div className="p-3 border-t text-center bg-theme-50 dark:bg-theme-900">
               <Link 
-                href="/dashboard/notifications" 
+                href="/dashboard/admin/notifications" 
                 className="text-xs text-theme hover:text-theme-600 hover:underline"
                 onClick={() => setIsNotificationOpen(false)}
               >

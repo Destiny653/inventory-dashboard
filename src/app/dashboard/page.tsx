@@ -92,7 +92,7 @@ export default function DashboardPage() {
       if (productsError) throw productsError
 
       // Calculate stats
-      const totalRevenue = ordersData?.reduce((sum: number, order: Order) => sum + (order.total_amount || 0), 0) || 0;
+      const totalRevenue = ordersData?.reduce((sum: number, order: Order) => sum + (order.total_amount || 0), 0).toFixed(2) || 0;
       const totalOrders = ordersData?.length || 0;
       const totalProducts = productsData?.length || 0;
       const lowStockItems = productsData?.filter((product: Product) => product.stock_quantity < 10).length || 0;
@@ -343,8 +343,8 @@ export default function DashboardPage() {
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                         color: COLORS.textPrimary
                       }}
-                      formatter={(value, name) => [
-                        name === 'sales' ? `$${value}` : value,
+                      formatter={(value:any, name) => [
+                        name === 'sales' ? `$${value?.toFixed(2)}` : value?.toFixed(2),
                         name === 'sales' ? 'Revenue' : 'Orders'
                       ]}
                       labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
