@@ -355,7 +355,7 @@ export default function AdminSettingsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleAssignRole(user)}
-                                className="bg-theme-primary text-white border-0 hover:bg-theme-primary-hover transition-all duration-200 shadow-sm"
+                                className="bg-theme-primary border-0 hover:bg-theme-primary-hover transition-all duration-200 shadow-sm"
                               >
                                 <Edit className="h-4 w-4 mr-1" />
                                 Edit Role
@@ -717,7 +717,7 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-2 bg-white">
                 <Label htmlFor="role" className="text-sm font-medium text-gray-700">
                   New Role
                 </Label>
@@ -725,7 +725,7 @@ export default function AdminSettingsPage() {
                   <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                     <SelectValue placeholder="Select a new role" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className='bg-white'>
                     <SelectItem value="user" className="py-3">
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-gray-400 rounded-full"></div>

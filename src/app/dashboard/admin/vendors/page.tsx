@@ -54,6 +54,7 @@ import { Search, MoreVertical, UserPlus, FileText, Loader2, Edit, Trash2, Chevro
 import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Label } from '@/components/ui/label'
+import Link from 'next/link'
 
 interface Vendor {
     id: string;
@@ -296,10 +297,12 @@ export default function AdminVendorsPage() {
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Vendors Management</h1>
                 <div className="flex items-center space-x-2">
+                    <Link href={'/dashboard/admin/settings'}>
                     <Button>
                         <UserPlus className="h-4 w-4 mr-2" />
                         Add Vendor
                     </Button>
+                    </Link>
                 </div>
             </div>
 
@@ -429,10 +432,6 @@ export default function AdminVendorsPage() {
                                                         <DropdownMenuItem onClick={() => viewVendorSales(vendor)}>
                                                             <FileText className="h-4 w-4 mr-2" />
                                                             View Sales
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => openEditVendor(vendor)}>
-                                                            <Edit className="h-4 w-4 mr-2" />
-                                                            Edit
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
@@ -634,48 +633,6 @@ export default function AdminVendorsPage() {
                                 </Button>
                             </div>
                         </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Vendor Edit Dialog */}
-            <Dialog open={isEditingVendor} onOpenChange={setIsEditingVendor}>
-                <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                        <DialogTitle>Edit Vendor</DialogTitle>
-                        <DialogDescription>
-                            Update vendor details below
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Full Name</Label>
-                            <Input
-                                id="name"
-                                defaultValue={selectedVendor?.full_name || ''}
-                                placeholder="Vendor name"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
-                                defaultValue={selectedVendor?.email || ''}
-                                placeholder="Vendor email"
-                                disabled
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="phone">Phone</Label>
-                            <Input
-                                id="phone"
-                                defaultValue={selectedVendor?.phone || ''}
-                                placeholder="Phone number"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit">Save changes</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
