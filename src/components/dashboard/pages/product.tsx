@@ -23,7 +23,7 @@ import { Plus, Edit, Trash, Image as ImageIcon, ChevronLeft, ChevronRight, Eye, 
 import ProductForm from '@/components/dashboard/ProductForm'
 import ProductDetails from '@/components/dashboard/ProductDetails'
 
-export  function ProductsPage() {
+export function ProductsPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [products, setProducts] = useState<{
@@ -43,6 +43,8 @@ export  function ProductsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<number | null>(null);
   const itemsPerPage = 9
 
   useEffect(() => {
@@ -67,31 +69,31 @@ export  function ProductsPage() {
   async function fetchProducts() {
     try {
       setLoading(true)
-      
+
       let query = supabase
         .from('products')
         .select('*, categories(id, name)')
-      
+
       if (selectedCategory !== 'all') {
         query = query.eq('category_id', selectedCategory)
       }
-      
+
       const countQuery = supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-      
+
       if (selectedCategory !== 'all') {
         countQuery.eq('category_id', selectedCategory)
       }
-      
+
       const { count, error: countError } = await countQuery
-      
+
       if (countError) throw countError
       setTotalCount(count || 0)
-      
+
       const { data, error } = await query
         .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1)
-      
+
       if (error) throw error
       setProducts(data || [])
     } catch (error) {
@@ -100,7 +102,7 @@ export  function ProductsPage() {
       setLoading(false)
     }
   }
-  
+
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm])
@@ -125,16 +127,26 @@ export  function ProductsPage() {
   }
 
   async function deleteProduct(id: number): Promise<void> {
+    setProductToDelete(id);
+    setIsDeleteDialogOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!productToDelete) return;
+
     try {
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', id)
+        .eq('id', productToDelete);
 
-      if (error) throw error
-      fetchProducts()
+      if (error) throw error;
+      fetchProducts(); // Refresh the product list
     } catch (error) {
-      console.error('Error deleting product:', error)
+      console.error('Error deleting product:', error);
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setProductToDelete(null);
     }
   }
 
@@ -314,6 +326,33 @@ export  function ProductsPage() {
                               }}
                               onSubmitSuccess={fetchProducts}
                             />
+                          </DialogContent>
+                        </Dialog>
+                        {/* Delete Confirmation Dialog */}
+                        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                          <DialogContent className="sm:max-w-[425px] bg-white rounded-lg">
+                            <DialogHeader>
+                              <DialogTitle className="text-gray-800">Confirm Deletion</DialogTitle>
+                            </DialogHeader>
+                            <div className="py-4 text-gray-600">
+                              Are you sure you want to delete this product? This action cannot be undone.
+                            </div>
+                            <div className="flex justify-end space-x-3">
+                              <Button
+                                variant="outline"
+                                onClick={() => setIsDeleteDialogOpen(false)}
+                                className="border-gray-300 hover:bg-gray-50"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                onClick={confirmDelete}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete
+                              </Button>
+                            </div>
                           </DialogContent>
                         </Dialog>
 

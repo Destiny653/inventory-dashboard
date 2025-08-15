@@ -5,6 +5,9 @@ import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Printer, Eye, Plus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
     Card,
     CardContent,
@@ -46,11 +49,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Search, MoreVertical, UserPlus, Filter, FileText, ShieldAlert, CheckCircle, XCircle, AlertTriangle, Loader2, Edit, Trash2 } from 'lucide-react'
-import { Label } from '@/components/ui/label'
+import { Search, MoreVertical, UserPlus, FileText, Loader2, Edit, Trash2, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Label } from '@/components/ui/label'
 
 interface Vendor {
     id: string;
@@ -65,6 +68,20 @@ interface Vendor {
     total_sales?: number;
 }
 
+interface VendorSale {
+    id: string;
+    transaction_date: string;
+    customer_name: string;
+    total: number;
+    items: Array<{
+        name: string;
+        price: number;
+        quantity: number;
+    }>;
+    payment_method: string;
+    staff_id: string;
+}
+
 export default function AdminVendorsPage() {
     const [vendors, setVendors] = useState<Vendor[]>([])
     const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([])
@@ -72,8 +89,14 @@ export default function AdminVendorsPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
+    const [vendorSales, setVendorSales] = useState<VendorSale[]>([])
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false)
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+    const [isSalesLoading, setIsSalesLoading] = useState(false)
+    const [isViewingSales, setIsViewingSales] = useState(false)
+    const [isEditingVendor, setIsEditingVendor] = useState(false)
+    const [vendorToDelete, setVendorToDelete] = useState<string | null>(null)
+    const [saleToDelete, setSaleToDelete] = useState<string | null>(null)
 
     useEffect(() => {
         fetchVendors()
@@ -87,22 +110,19 @@ export default function AdminVendorsPage() {
         try {
             setLoading(true)
 
-            // Check if admin client is available
             if (!supabaseAdmin) {
-                toast.error('Admin client not configured. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.')
+                toast.error('Admin client not configured.')
                 return
             }
 
-            // Get all users with vendor role
             const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
-            
+
             if (authError) {
                 console.error('Error fetching vendors:', authError)
                 toast.error('Failed to fetch vendors')
                 return
             }
 
-            // Filter users with vendor role and convert to Vendor format
             const vendorUsers: Vendor[] = authUsers.users
                 .filter(user => user.user_metadata?.role === 'vendor')
                 .map(user => ({
@@ -128,47 +148,69 @@ export default function AdminVendorsPage() {
         }
     }
 
-    function filterVendors() {
-        let filtered = [...vendors]
+    async function fetchVendorSales(vendorId: string) {
+        try {
+            setIsSalesLoading(true)
+            const { data, error } = await supabase
+                .from('completed_sales')
+                .select('*')
+                .eq('staff_id', vendorId)
+                .order('transaction_date', { ascending: false })
 
-        // Apply search filter
-        if (searchTerm) {
-            filtered = filtered.filter(vendor =>
-                vendor.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                vendor.email.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            if (error) throw error
+
+            setVendorSales(data || [])
+        } catch (error) {
+            console.error('Error fetching vendor sales:', error)
+            toast.error('Failed to fetch vendor sales')
+        } finally {
+            setIsSalesLoading(false)
         }
-
-        // Apply status filter
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(vendor => vendor.status === statusFilter);
-        }
-
-        setFilteredVendors(filtered);
     }
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
+    async function deleteVendor() {
+        if (!vendorToDelete || !supabaseAdmin) return
 
-    const getStatusBadge = (status?: string) => {
-        switch (status) {
-            case 'active':
-                return <Badge className="bg-green-100 text-green-800">Active</Badge>;
-            case 'pending':
-                return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-            case 'suspended':
-                return <Badge className="bg-red-100 text-red-800">Suspended</Badge>;
-            default:
-                return <Badge className="bg-green-100 text-green-800">Active</Badge>;
+        try {
+            const { error } = await supabaseAdmin.auth.admin.deleteUser(vendorToDelete)
+
+            if (error) throw error
+
+            toast.success('Vendor deleted successfully')
+            fetchVendors()
+        } catch (error) {
+            console.error('Error deleting vendor:', error)
+            toast.error('Failed to delete vendor')
+        } finally {
+            setVendorToDelete(null)
+            setIsDeleteAlertOpen(false)
         }
-    };
+    }
 
-    const updateVendorStatus = async (vendorId: string, newStatus: string) => {
+    async function deleteSale() {
+        if (!saleToDelete) return
+
+        try {
+            const { error } = await supabase
+                .from('completed_sales')
+                .delete()
+                .eq('id', saleToDelete)
+
+            if (error) throw error
+
+            toast.success('Sale deleted successfully')
+            if (selectedVendor) {
+                fetchVendorSales(selectedVendor.id)
+            }
+        } catch (error) {
+            console.error('Error deleting sale:', error)
+            toast.error('Failed to delete sale')
+        } finally {
+            setSaleToDelete(null)
+        }
+    }
+
+    async function updateVendorStatus(vendorId: string, status: string) {
         try {
             setIsUpdatingStatus(true)
 
@@ -177,206 +219,231 @@ export default function AdminVendorsPage() {
                 return
             }
 
-            // Get current user metadata
-            const { data: currentUser, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(vendorId)
-            
-            if (fetchError) {
-                console.error('Error fetching vendor:', fetchError)
-                toast.error('Failed to fetch vendor data')
-                return
-            }
-
-            // Prepare updated metadata
-            const currentMetadata = currentUser.user.user_metadata || {}
-            const updatedMetadata = {
-                ...currentMetadata,
-                status: newStatus
-            }
-
-            // Update user metadata with new status
             const { error } = await supabaseAdmin.auth.admin.updateUserById(vendorId, {
-                user_metadata: updatedMetadata
+                user_metadata: { status }
             })
 
-            if (error) {
-                console.error('Error updating vendor status:', error)
-                toast.error('Failed to update vendor status')
-                return
-            }
+            if (error) throw error
 
-            // Update local state
-            setVendors(vendors.map(vendor =>
-                vendor.id === vendorId ? { ...vendor, status: newStatus } : vendor
-            ));
-
-            toast.success(`Vendor status updated to ${newStatus}`)
+            toast.success(`Vendor status updated to ${status}`)
+            fetchVendors()
         } catch (error) {
             console.error('Error updating vendor status:', error)
             toast.error('Failed to update vendor status')
         } finally {
             setIsUpdatingStatus(false)
         }
-    };
+    }
 
-    const deleteVendor = async (vendorId: string) => {
-        try {
-            if (!supabaseAdmin) {
-                toast.error('Admin client not configured.')
-                return
-            }
+    function filterVendors() {
+        let filtered = [...vendors]
 
-            // Delete user from Supabase Auth
-            const { error } = await supabaseAdmin.auth.admin.deleteUser(vendorId)
-
-            if (error) {
-                console.error('Error deleting vendor:', error)
-                toast.error('Failed to delete vendor')
-                return
-            }
-
-            // Update local state
-            setVendors(vendors.filter(vendor => vendor.id !== vendorId));
-            setIsDeleteAlertOpen(false);
-            toast.success('Vendor deleted successfully')
-        } catch (error) {
-            console.error('Error deleting vendor:', error)
-            toast.error('Failed to delete vendor')
+        if (searchTerm) {
+            filtered = filtered.filter(vendor =>
+                vendor.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                vendor.email.toLowerCase().includes(searchTerm.toLowerCase())
+            )
         }
-    };
 
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(vendor => vendor.status === statusFilter)
+        }
+
+        setFilteredVendors(filtered)
+    }
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        })
+    }
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(amount)
+    }
+
+    const getStatusBadge = (status?: string) => {
+        switch (status) {
+            case 'active':
+                return <Badge variant="default">Active</Badge>
+            case 'inactive':
+                return <Badge variant="secondary">Inactive</Badge>
+            case 'suspended':
+                return <Badge variant="destructive">Suspended</Badge>
+            default:
+                return <Badge variant="outline">Unknown</Badge>
+        }
+    }
+
+    const viewVendorSales = (vendor: Vendor) => {
+        setSelectedVendor(vendor)
+        fetchVendorSales(vendor.id)
+        setIsViewingSales(true)
+    }
+
+    const openEditVendor = (vendor: Vendor) => {
+        setSelectedVendor(vendor)
+        setIsEditingVendor(true)
     }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Vendor Management</h1>
+                <h1 className="text-2xl font-bold">Vendors Management</h1>
+                <div className="flex items-center space-x-2">
+                    <Button>
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Add Vendor
+                    </Button>
+                </div>
             </div>
 
             <Card>
-                <CardHeader className="pb-3">
-                    <CardTitle>Vendors</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col md:flex-row gap-4 mb-6">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                            <Input
-                                placeholder="Search vendors..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-8"
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Filter className="h-4 w-4 text-gray-500" />
-                            <Tabs
-                                value={statusFilter}
-                                onValueChange={setStatusFilter}
-                                className="w-[400px]"
-                            >
-                                <TabsList>
-                                    <TabsTrigger value="all">All</TabsTrigger>
-                                    <TabsTrigger value="active">Active</TabsTrigger>
-                                    <TabsTrigger value="pending">Pending</TabsTrigger>
-                                    <TabsTrigger value="suspended">Suspended</TabsTrigger>
-                                </TabsList>
-                            </Tabs>
+                <CardHeader>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <CardTitle>Vendors List</CardTitle>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative">
+                                <Input
+                                    placeholder="Search vendors..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10"
+                                />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            </div>
+                            <div className="relative">
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="h-10 px-3 pr-8 py-2 rounded-md border border-gray-300 bg-white text-gray-700 appearance-none"
+                                >
+                                    <option value="all">All Statuses</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="suspended">Suspended</option>
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                            </div>
                         </div>
                     </div>
-
-                    {filteredVendors.length === 0 ? (
-                        <div className="text-center py-10">
-                            <p className="text-gray-500">No vendors found matching your criteria</p>
+                </CardHeader>
+                <CardContent>
+                    {loading ? (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                    ) : filteredVendors.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            No vendors found matching your criteria
                         </div>
                     ) : (
-                        <div className="border rounded-lg overflow-hidden shadow-sm">
+                        <div className="rounded-md border">
                             <Table>
-                                <TableHeader className="bg-theme-50 dark:bg-theme-900">
-                                    <TableRow className="border-b border-theme-200 dark:border-theme-800">
-                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Vendor</TableHead>
-                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Status</TableHead>
-                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Products</TableHead>
-                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Total Sales</TableHead>
-                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold">Joined</TableHead>
-                                        <TableHead className="text-theme-900 dark:text-theme-100 font-semibold text-right">Actions</TableHead>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Vendor</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Phone</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Joined</TableHead>
+                                        <TableHead>Sales</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredVendors.map((vendor, index) => (
-                                        <TableRow 
-                                            key={vendor.id} 
-                                            className={`border-b border-theme-100 dark:border-theme-800 hover:bg-theme-50 dark:hover:bg-theme-900/50 transition-all duration-200 ${
-                                                index % 2 === 0 ? 'bg-white dark:bg-theme-950' : 'bg-theme-50 dark:bg-theme-900/50'
-                                            }`}
-                                        >
+                                    {filteredVendors.map((vendor) => (
+                                        <TableRow key={vendor.id}>
                                             <TableCell>
                                                 <div className="flex items-center space-x-3">
-                                                    <div className="w-8 h-8 rounded-full bg-theme-primary flex items-center justify-center text-white text-sm font-semibold">
-                                                        {vendor.full_name?.charAt(0) || vendor.email?.charAt(0) || 'V'}
-                                                    </div>
+                                                    <Avatar className="h-9 w-9">
+                                                        <AvatarImage src={vendor.avatar_url} />
+                                                        <AvatarFallback>
+                                                            {vendor.full_name?.charAt(0) || 'V'}
+                                                        </AvatarFallback>
+                                                    </Avatar>
                                                     <div>
-                                                        <div className="font-medium text-theme-900 dark:text-theme-100">{vendor.full_name}</div>
-                                                        <div className="text-sm text-theme-600 dark:text-theme-300">{vendor.email}</div>
-                                                        <div className="text-xs text-theme-500 dark:text-theme-400">{vendor.phone}</div>
+                                                        <div className="font-medium">{vendor.full_name}</div>
+                                                        <div className="text-sm text-gray-500">
+                                                            {vendor.products_count || 0} products
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{getStatusBadge(vendor.status)}</TableCell>
-                                            <TableCell className="text-theme-600 dark:text-theme-300">{vendor.products_count || 0}</TableCell>
-                                            <TableCell className="text-theme-600 dark:text-theme-300">${(vendor.total_sales || 0).toLocaleString()}</TableCell>
-                                            <TableCell className="text-theme-600 dark:text-theme-300">{formatDate(vendor.created_at)}</TableCell>
+                                            <TableCell>{vendor.email}</TableCell>
+                                            <TableCell>{vendor.phone}</TableCell>
+                                            <TableCell>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger>
+                                                        <div className="flex items-center">
+                                                            {getStatusBadge(vendor.status)}
+                                                            <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
+                                                        </div>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="start" className='bg-white'>
+                                                        <DropdownMenuItem
+                                                            onClick={() => updateVendorStatus(vendor.id, 'active')}
+                                                            disabled={isUpdatingStatus}
+                                                        >
+                                                            <span className="text-green-600">Active</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => updateVendorStatus(vendor.id, 'inactive')}
+                                                            disabled={isUpdatingStatus}
+                                                        >
+                                                            <span className="text-gray-600">Inactive</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => updateVendorStatus(vendor.id, 'suspended')}
+                                                            disabled={isUpdatingStatus}
+                                                        >
+                                                            <span className="text-red-600">Suspended</span>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                            <TableCell>{formatDate(vendor.created_at)}</TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => viewVendorSales(vendor)}
+                                                >
+                                                    {formatCurrency(vendor.total_sales || 0)}
+                                                </Button>
+                                            </TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon">
+                                                        <Button variant="ghost" size="sm">
                                                             <MoreVertical className="h-4 w-4" />
-                                                            <span className="sr-only">Open menu</span>
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
+                                                    <DropdownMenuContent align="end" className='bg-white'>
                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem onClick={() => setSelectedVendor(vendor)}>
-                                                            <FileText className="mr-2 h-4 w-4" />
-                                                            View Details
+                                                        <DropdownMenuItem onClick={() => viewVendorSales(vendor)}>
+                                                            <FileText className="h-4 w-4 mr-2" />
+                                                            View Sales
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => openEditVendor(vendor)}>
+                                                            <Edit className="h-4 w-4 mr-2" />
+                                                            Edit
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-
-                                                        {vendor.status !== 'active' && (
-                                                            <DropdownMenuItem 
-                                                                onClick={() => updateVendorStatus(vendor.id, 'active')}
-                                                                disabled={isUpdatingStatus}
-                                                            >
-                                                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                                                                Activate Vendor
-                                                            </DropdownMenuItem>
-                                                        )}
-
-                                                        {vendor.status !== 'suspended' && (
-                                                            <DropdownMenuItem 
-                                                                onClick={() => updateVendorStatus(vendor.id, 'suspended')}
-                                                                disabled={isUpdatingStatus}
-                                                            >
-                                                                <ShieldAlert className="mr-2 h-4 w-4 text-amber-500" />
-                                                                Suspend Vendor
-                                                            </DropdownMenuItem>
-                                                        )}
-
                                                         <DropdownMenuItem
-                                                            className="text-red-500 focus:text-red-500"
+                                                            className="text-red-600"
                                                             onClick={() => {
-                                                                setSelectedVendor(vendor)
+                                                                setVendorToDelete(vendor.id)
                                                                 setIsDeleteAlertOpen(true)
                                                             }}
                                                         >
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            Delete Vendor
+                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            Delete
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -390,101 +457,244 @@ export default function AdminVendorsPage() {
                 </CardContent>
             </Card>
 
-            {/* Vendor Details Dialog */}
-            {selectedVendor && (
-                <Dialog open={selectedVendor !== null && !isDeleteAlertOpen} onOpenChange={(open) => !open && setSelectedVendor(null)}>
-                    <DialogContent className="bg-white sm:max-w-[600px] border-0 shadow-lg">
-                        <DialogHeader className="pb-4 border-b border-gray-200">
-                            <DialogTitle className="text-xl font-semibold text-gray-900">
-                                Vendor Details
-                            </DialogTitle>
-                            <DialogDescription className="text-gray-600 mt-2">
-                                Detailed information about the vendor.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="py-6 space-y-6">
-                            {/* Vendor Info */}
-                            <div className="bg-theme-50 dark:bg-theme-900 p-4 rounded-lg border border-theme-200 dark:border-theme-800">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-12 h-12 bg-theme-primary rounded-full flex items-center justify-center">
-                                        <span className="text-white font-semibold text-lg">
-                                            {selectedVendor.full_name?.charAt(0) || 'V'}
+            {/* Vendor Sales Dialog */}
+            <Dialog open={isViewingSales} onOpenChange={setIsViewingSales}>
+                <DialogContent className="w-[55vw] max-h-[90vh] flex flex-col bg-white rounded-lg shadow-xl p-0 overflow-hidden box-border">
+                    <DialogHeader className="border-b p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-start sm:items-center gap-3">
+                                <Avatar className="h-10 w-10 flex-shrink-0">
+                                    <AvatarImage src={selectedVendor?.avatar_url} />
+                                    <AvatarFallback>
+                                        {selectedVendor?.full_name?.charAt(0) || 'V'}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <DialogTitle className="text-xl sm:text-2xl font-bold text-gray-800">
+                                        {selectedVendor?.full_name}'s Sales
+                                    </DialogTitle>
+                                    <DialogDescription className="text-gray-600 mt-1 text-sm sm:text-base">
+                                        <span className="font-medium text-gray-800">{vendorSales.length}</span> sales totaling{' '}
+                                        <span className="font-medium text-green-600">
+                                            {formatCurrency(vendorSales.reduce((sum, sale) => sum + sale.total, 0))}
                                         </span>
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900 dark:text-gray-100">{selectedVendor.full_name}</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{selectedVendor.email}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-500">
-                                            Joined: {formatDate(selectedVendor.created_at)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        {getStatusBadge(selectedVendor.status)}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Contact Information */}
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700">Contact Information</Label>
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <div className="space-y-2">
-                                            <p className="text-sm"><span className="font-medium">Email:</span> {selectedVendor.email}</p>
-                                            <p className="text-sm"><span className="font-medium">Phone:</span> {selectedVendor.phone}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700">Store Information</Label>
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <div className="space-y-2">
-                                            <p className="text-sm"><span className="font-medium">Products:</span> {selectedVendor.products_count || 0}</p>
-                                            <p className="text-sm"><span className="font-medium">Total Sales:</span> ${(selectedVendor.total_sales || 0).toLocaleString()}</p>
-                                            <p className="text-sm"><span className="font-medium">Joined:</span> {formatDate(selectedVendor.created_at)}</p>
-                                        </div>
-                                    </div>
+                                    </DialogDescription>
                                 </div>
                             </div>
                         </div>
-                        
-                        <DialogFooter className="pt-4 border-t border-gray-200">
-                            <Button 
-                                variant="outline" 
-                                onClick={() => setSelectedVendor(null)}
-                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                                Close
-                            </Button>
-                            <Button 
-                                onClick={() => setIsDeleteAlertOpen(true)}
-                                className="bg-red-600 hover:bg-red-700 text-white"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Vendor
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
+                    </DialogHeader>
 
-            {/* Delete Confirmation Dialog */}
+                    {isSalesLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12 flex-1">
+                            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                            <p className="mt-4 text-gray-600">Loading sales data...</p>
+                        </div>
+                    ) : vendorSales.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 flex-1">
+                            <FileText className="h-12 w-12 text-gray-400" />
+                            <h3 className="mt-4 text-lg font-medium text-gray-900">No sales found</h3>
+                            <p className="mt-1 text-sm text-gray-500">This vendor hasn't made any sales yet.</p>
+                        </div>
+                    ) : (
+                        <ScrollArea className="flex-1 px-4 sm:px-6 overflow-x-auto">
+                            <div className="space-y-6 py-2">
+                                {/* Summary Cards */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-[]">
+                                    <Card className="bg-blue-50 border-blue-100">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-medium text-blue-800">Total Sales</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-xl sm:text-2xl font-bold text-blue-900">
+                                                {formatCurrency(vendorSales.reduce((sum, sale) => sum + sale.total, 0))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="bg-green-50 border-green-100">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-medium text-green-800">Average Sale</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-xl sm:text-2xl font-bold text-green-900">
+                                                {formatCurrency(vendorSales.reduce((sum, sale) => sum + sale.total, 0) / vendorSales.length)}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="bg-purple-50 border-purple-100">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-medium text-purple-800">Total Items Sold</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-xl sm:text-2xl font-bold text-purple-900">
+                                                {vendorSales.reduce((sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0)}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Sales Table */}
+                                <Card className="border-gray-200 overflow-x-auto">
+                                    <Table className="min-w-[600px]">
+                                        <TableHeader className="bg-gray-50">
+                                            <TableRow>
+                                                <TableHead className="w-[120px]">Date</TableHead>
+                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Items</TableHead>
+                                                <TableHead className="text-right">Amount</TableHead>
+                                                <TableHead>Payment</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {vendorSales.map((sale) => (
+                                                <TableRow key={sale.id} className="hover:bg-gray-50/50">
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex flex-col">
+                                                            <span className="whitespace-nowrap">{formatDate(sale.transaction_date)}</span>
+                                                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                                                                {new Date(sale.transaction_date).toLocaleTimeString()}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium truncate max-w-[120px]">
+                                                            {sale.customer_name || 'Anonymous'}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Popover>
+                                                            <PopoverTrigger asChild>
+                                                                <Button variant="ghost" size="sm" className="h-8 px-2">
+                                                                    <span>{sale.items.length} item{sale.items.length !== 1 ? 's' : ''}</span>
+                                                                    <ChevronDown className="ml-1 h-4 w-4" />
+                                                                </Button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-[300px] p-0 bg-white" align="start">
+                                                                <div className="p-4">
+                                                                    <h4 className="font-medium mb-2">Items in this sale</h4>
+                                                                    <div className="space-y-3">
+                                                                        {sale.items.map((item, index) => (
+                                                                            <div key={index} className="flex justify-between items-center">
+                                                                                <div>
+                                                                                    <p className="font-medium">{item.name}</p>
+                                                                                    <p className="text-sm text-gray-500">
+                                                                                        {item.quantity} × {formatCurrency(item.price)}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div className="font-medium">
+                                                                                    {formatCurrency(item.price * item.quantity)}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                    <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between font-medium">
+                                                                        <span>Total</span>
+                                                                        <span>{formatCurrency(sale.total)}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </PopoverContent>
+                                                        </Popover>
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium text-green-600 whitespace-nowrap">
+                                                        {formatCurrency(sale.total)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                                "capitalize whitespace-nowrap",
+                                                                sale.payment_method === 'cash' ? 'bg-green-50 text-green-700' :
+                                                                    sale.payment_method === 'card' ? 'bg-blue-50 text-blue-700' :
+                                                                        'bg-gray-50 text-gray-700'
+                                                            )}
+                                                        >
+                                                            {sale.payment_method}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </Card>
+                            </div>
+                        </ScrollArea>
+                    )}
+
+                    <DialogFooter className="border-t p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-4">
+                            <div className="text-sm text-gray-500">
+                                Showing <span className="font-medium">{vendorSales.length}</span> sales
+                            </div>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsViewingSales(false)}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Vendor Edit Dialog */}
+            <Dialog open={isEditingVendor} onOpenChange={setIsEditingVendor}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit Vendor</DialogTitle>
+                        <DialogDescription>
+                            Update vendor details below
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Full Name</Label>
+                            <Input
+                                id="name"
+                                defaultValue={selectedVendor?.full_name || ''}
+                                placeholder="Vendor name"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                defaultValue={selectedVendor?.email || ''}
+                                placeholder="Vendor email"
+                                disabled
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone</Label>
+                            <Input
+                                id="phone"
+                                defaultValue={selectedVendor?.phone || ''}
+                                placeholder="Phone number"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit">Save changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Vendor Confirmation */}
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-                <AlertDialogContent>
+                <AlertDialogContent className='bg-white'>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the vendor
-                            account and remove all associated data from our servers.
+                            This action cannot be undone. This will permanently delete the vendor account
+                            and all associated data.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-red-500 hover:bg-red-600"
-                            onClick={() => selectedVendor && deleteVendor(selectedVendor.id)}
+                            onClick={deleteVendor}
+                            className="bg-red-600 hover:bg-red-700"
                         >
                             Delete
                         </AlertDialogAction>
@@ -492,6 +702,5 @@ export default function AdminVendorsPage() {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
-    );
-};
-
+    )
+}
